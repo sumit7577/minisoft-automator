@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ROADtools Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0b0d12;
+    color: #e6e6e6;
+    margin: 0;
+    display: flex;
+  }
+  .sidebar {
+    width: 60px;
+    background: #10131a;
+    border-right: 1px solid #1e2230;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    gap: 6px;
+    min-height: 100vh;
+  }
+  .sidebar .brand {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #2b5fd9;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 18px;
+  }
+  .sidebar .icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8a91a6;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .sidebar .icon-btn.active {
+    background: #182033;
+    color: #5b8dfa;
+    box-shadow: inset 0 0 0 1px #2b5fd9;
+  }
+  .sidebar .icon-btn:hover { color: #e6e6e6; }
+
+  .main { flex: 1; padding: 32px 40px; max-width: 1400px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .subtitle { color: #8a91a6; font-size: 14px; margin: 0 0 28px; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #12151d;
+    border: 1px solid #1e2230;
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .stat-label {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: #8a91a6;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .stat-value { font-size: 30px; font-weight: 700; }
+  .stat-value.blue { color: #5b8dfa; }
+  .stat-value.purple { color: #a78bfa; }
+  .stat-value.yellow { color: #eab308; }
+  .stat-value.green { color: #4ade80; }
+
+  .panel {
+    background: #12151d;
+    border: 1px solid #1e2230;
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .panel-header h2 { font-size: 15px; margin: 0; }
+  .panel-header a, .panel-header button {
+    font-size: 13px;
+    color: #5b8dfa;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    color: #8a91a6;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 8px 6px;
+    border-bottom: 1px solid #1e2230;
+  }
+  tbody td {
+    padding: 10px 6px;
+    border-bottom: 1px solid #171a22;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .empty-row td {
+    text-align: center;
+    color: #6b7280;
+    padding: 24px 0;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+
+  .add-user-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .add-user-form input {
+    background: #0b0d12;
+    border: 1px solid #262b3a;
+    border-radius: 6px;
+    color: #e6e6e6;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .add-user-form button {
+    background: #2b5fd9;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .add-user-form button:hover { background: #234db3; }
+
+  .delete-link { color: #f87171; cursor: pointer; font-size: 12px; background: none; border: none; }
+  .delete-link:hover { text-decoration: underline; }
+
+  #formStatus { font-size: 12px; margin-top: 6px; min-height: 16px; }
+  .status-error { color: #f87171; }
+  .status-success { color: #4ade80; }
+
+  /* Authenticate panel */
+  .method-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .method-tab {
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid #262b3a;
+    background: transparent;
+    color: #8a91a6;
+    cursor: pointer;
+  }
+  .method-tab.active { border-color: #2b5fd9; color: #5b8dfa; background: #182033; }
+  .field-group { display: none; }
+  .field-group.active { display: block; }
+  .auth-layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; }
+  @media (max-width: 900px) { .auth-layout { grid-template-columns: 1fr; } }
+  .auth-fields label { display: block; font-size: 12px; color: #8a91a6; margin: 12px 0 5px; }
+  .auth-fields label:first-child { margin-top: 0; }
+  .auth-fields input[type=text], .auth-fields input[type=password] {
+    width: 100%;
+    background: #0b0d12;
+    border: 1px solid #262b3a;
+    border-radius: 6px;
+    color: #e6e6e6;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .auth-preview { border-left: 1px solid #1e2230; padding-left: 20px; }
+  @media (max-width: 900px) {
+    .auth-preview { border-left: none; border-top: 1px solid #1e2230; padding-left: 0; padding-top: 16px; margin-top: 16px; }
+  }
+  .cmd-preview {
+    background: #0b0d12;
+    border: 1px solid #262b3a;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    color: #5b8dfa;
+    word-break: break-all;
+    white-space: pre-wrap;
+    min-height: 56px;
+  }
+  .cmd-preview .prefix { color: #8a91a6; }
+  .preview-note { font-size: 11px; color: #8a91a6; margin-top: 8px; }
+
+  .btn-primary {
+    background: #2b5fd9; color: #fff; border: none; border-radius: 6px;
+    padding: 9px 18px; font-size: 13px; cursor: pointer; margin-top: 14px;
+  }
+  .btn-primary:hover { background: #234db3; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent; color: #8a91a6; border: 1px solid #262b3a; border-radius: 6px;
+    padding: 9px 18px; font-size: 13px; cursor: pointer; margin-top: 14px; margin-left: 8px;
+  }
+  .btn-secondary:hover { color: #e6e6e6; border-color: #2b5fd9; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+
+  .console-log {
+    background: #0b0d12;
+    border: 1px solid #1e2230;
+    border-radius: 6px;
+    padding: 14px 16px;
+    height: 220px;
+    overflow-y: auto;
+    font-size: 12px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #9fb3c8;
+  }
+  .console-log .entry { border-bottom: 1px dashed #1e2230; padding: 8px 0; }
+  .console-log .entry:last-child { border-bottom: none; }
+  .console-log .meta { color: #8a91a6; font-size: 11px; }
+  .console-log .cmdline { color: #5b8dfa; }
+  .console-log .ok { color: #4ade80; }
+  .console-log .err { color: #f87171; }
+
+  .spinner {
+    display: inline-block; width: 11px; height: 11px;
+    border: 2px solid #262b3a; border-top-color: #5b8dfa;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .il-step { margin-top: 4px; }
+  .mfa-option-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    text-align: left; padding: 12px 10px; margin-bottom: 6px;
+    background: #0b0d12; border: 1px solid #262b3a; border-radius: 6px;
+    font-size: 13px; color: #e6e6e6; cursor: pointer;
+  }
+  .mfa-option-btn:hover { border-color: #2b5fd9; background: #10131a; }
+  .mfa-option-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="brand">R</div>
+  <a class="icon-btn active" href="#dashboardTop" title="Dashboard">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+  </a>
+  <a class="icon-btn" href="#authPanel" title="Authenticate">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3"/><path d="M16 7l3 3"/></svg>
+  </a>
+  <a class="icon-btn" href="#gatherPanel" title="Gather">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/></svg>
+  </a>
+  <a class="icon-btn" href="#tablesPanel" title="Database">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+  </a>
+  <a class="icon-btn" href="#usersPanel" title="Users">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 19c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M16 13.2c2.7 .3 4.5 2 4.5 5.3"/></svg>
+  </a>
+  <div style="flex:1;"></div>
+  <button class="icon-btn" id="logoutBtn" title="Logout" style="border:none; background:none; cursor:pointer;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+  </button>
+</div>
+
+<div class="main">
+  <h1 id="dashboardTop">Dashboard</h1>
+  <p class="subtitle">Live overview of your ROADtools data</p>
+
+  <div class="stat-grid" id="statGrid">
+    <div class="stat-card"><div class="stat-label">Access Tokens</div><div class="stat-value blue" id="statAccessTokens">–</div></div>
+    <div class="stat-card"><div class="stat-label">Refresh Tokens</div><div class="stat-value purple" id="statRefreshTokens">–</div></div>
+    <div class="stat-card"><div class="stat-label">Device Codes</div><div class="stat-value yellow" id="statDeviceCodes">–</div></div>
+    <div class="stat-card"><div class="stat-label">Device Certs</div><div class="stat-value green" id="statDeviceCerts">–</div></div>
+    <div class="stat-card"><div class="stat-label">PRTs</div><div class="stat-value blue" id="statPrts">–</div></div>
+    <div class="stat-card"><div class="stat-label">Databases</div><div class="stat-value purple" id="statDatabases">–</div></div>
+  </div>
+
+  <div class="panel" id="authPanel">
+    <div class="panel-header">
+      <h2>Authenticate</h2>
+    </div>
+    <div class="method-tabs">
+      <button type="button" class="method-tab active" data-method="password">Password</button>
+      <button type="button" class="method-tab" data-method="devicecode">Device code</button>
+      <button type="button" class="method-tab" data-method="interactive">Interactive (live)</button>
+      <button type="button" class="method-tab" data-method="keepass">KeePass</button>
+      <button type="button" class="method-tab" data-method="prt">PRT</button>
+    </div>
+
+    <div class="auth-layout" id="authLayoutSimple">
+      <div class="auth-fields">
+
+        <div class="field-group active" data-method="password">
+          <p class="subtitle" style="margin:0 0 8px;">ROPC grant. No MFA support.</p>
+          <label>Username</label>
+          <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+          <label>Password</label>
+          <input type="password" class="f" data-k="password" placeholder="••••••••">
+          <label>Tenant ID (optional)</label>
+          <input type="text" class="f" data-k="tenant" placeholder="leave blank for common">
+        </div>
+
+        <div class="field-group" data-method="devicecode">
+          <p class="subtitle" style="margin:0;">Supports MFA. No fields needed — a code + URL will appear in Output below; complete sign-in in your browser.</p>
+        </div>
+
+        <div class="field-group" data-method="keepass">
+          <p class="subtitle" style="margin:0 0 8px;">Automates MFA using a TOTP seed already enrolled, stored in a KeePass DB you own.</p>
+          <label>Username</label>
+          <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+          <label>KeePass file path (.kdbx)</label>
+          <input type="text" class="f" data-k="kdbx_path" placeholder="/path/to/accounts.kdbx">
+          <label>KeePass DB password</label>
+          <input type="password" class="f" data-k="kdbx_password" placeholder="••••••••">
+          <label>Client alias (optional)</label>
+          <input type="text" class="f" data-k="client" placeholder="e.g. azcli, msteams">
+        </div>
+
+        <div class="field-group" data-method="prt">
+          <p class="subtitle" style="margin:0 0 8px;">Requests a Primary Refresh Token via device key/cert. Usually still requires prior MFA enrollment via prtenrich.</p>
+          <label>Username</label>
+          <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+          <label>Password</label>
+          <input type="password" class="f" data-k="password" placeholder="••••••••">
+          <label>Device key .pem path</label>
+          <input type="text" class="f" data-k="key_pem" placeholder="/path/to/device.key">
+          <label>Device cert .pem path</label>
+          <input type="text" class="f" data-k="cert_pem" placeholder="/path/to/device.pem">
+        </div>
+
+        <button class="btn-primary" id="btn-authenticate">Authenticate</button>
+      </div>
+
+      <div class="auth-preview">
+        <label style="margin-top:0;">Command that will run</label>
+        <div class="cmd-preview" id="cmd-preview"><span class="prefix">$</span> roadrecon auth -u &lt;username&gt; -p &lt;password&gt;</div>
+        <div class="preview-note">Password fields are masked here as ******** — they're still sent securely, just not echoed on screen.</div>
+      </div>
+    </div>
+
+    <div class="field-group" data-method="interactive">
+      <p class="subtitle" style="margin:0 0 12px;">Opens a real browser window on the server and drives it live — react to whatever MFA prompt appears, right here.</p>
+
+      <div class="il-step" id="ilUsernameStep">
+        <label>Username</label>
+        <input type="text" id="ilUsername" placeholder="user@tenant.onmicrosoft.com">
+        <button type="button" class="btn-primary" id="ilStartBtn">Start sign-in</button>
+      </div>
+
+      <div class="il-step" id="ilPasswordStep" style="display:none;">
+        <label>Password</label>
+        <input type="password" id="ilPassword" placeholder="••••••••">
+        <button type="button" class="btn-primary" id="ilPasswordBtn">Sign in</button>
+        <button type="button" class="btn-secondary" id="ilBackBtn">Back</button>
+      </div>
+
+      <div class="il-step" id="ilMfaChoiceStep" style="display:none;">
+        <div id="ilMfaOptionsList"></div>
+        <p class="subtitle" id="ilMfaWaitingNote"><span class="spinner"></span>Waiting for you to pick a method...</p>
+        <button type="button" class="btn-secondary" id="ilMfaCancelBtn">Cancel</button>
+      </div>
+
+      <div class="il-step" id="ilMfaCodeStep" style="display:none;">
+        <p class="subtitle" id="ilMfaCodeContext" style="margin:0 0 8px;">Enter your verification code.</p>
+        <label>Code</label>
+        <input type="text" id="ilMfaCode" placeholder="123456" inputmode="numeric">
+        <button type="button" class="btn-primary" id="ilMfaCodeBtn">Verify</button>
+      </div>
+
+      <div class="il-step subtitle" id="ilStatus" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel" id="gatherPanel">
+      <div class="panel-header"><h2>Gather</h2></div>
+      <p class="subtitle" style="margin:0 0 10px;">Builds roadrecon.db from the tenant. Can take a while on larger tenants.</p>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <input type="checkbox" id="mfa-check">
+        <label for="mfa-check" style="margin:0; font-size:13px; color:#8a91a6;">Include MFA info (requires privileged role)</label>
+      </div>
+      <button class="btn-primary" id="btn-gather">Run gather</button>
+    </div>
+
+    <div class="panel" id="guiPanel">
+      <div class="panel-header"><h2>GUI</h2></div>
+      <p class="subtitle" style="margin:0 0 10px;">Launches the standard ROADrecon Flask GUI on its default port.</p>
+      <button class="btn-primary" id="btn-gui">Launch GUI</button>
+    </div>
+  </div>
+
+  <div class="panel" id="customPanel">
+    <div class="panel-header"><h2>Custom command</h2></div>
+    <p class="subtitle" style="margin:0 0 10px;">Arguments appended after <code>roadrecon</code>, e.g. <code>plugin -h</code></p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <input type="text" id="custom-args" placeholder="plugin -h" style="flex:1; min-width:200px; background:#0b0d12; border:1px solid #262b3a; border-radius:6px; color:#e6e6e6; padding:8px 10px; font-size:13px;">
+      <button class="btn-primary" id="btn-custom-run" style="margin-top:0;">Run</button>
+    </div>
+  </div>
+
+  <div class="panel" id="outputPanel">
+    <div class="panel-header"><h2>Output</h2></div>
+    <div class="console-log" id="console">waiting for first command…</div>
+  </div>
+
+  <div class="panel" id="tablesPanel">
+    <div class="panel-header">
+      <h2>roadrecon.db Tables</h2>
+    </div>
+    <table>
+      <thead><tr><th>Table</th><th>Row Count</th></tr></thead>
+      <tbody id="tablesBody">
+        <tr class="empty-row"><td colspan="2">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="usersPanel">
+    <div class="panel-header">
+      <h2>Admin Users</h2>
+    </div>
+
+    <div class="add-user-form">
+      <input type="text" id="newUsername" placeholder="Username">
+      <input type="password" id="newPassword" placeholder="Password">
+      <button id="addUserBtn">+ Add Admin</button>
+    </div>
+    <div id="formStatus"></div>
+
+    <table>
+      <thead><tr><th>ID</th><th>Username</th><th>Created</th><th></th></tr></thead>
+      <tbody id="usersBody">
+        <tr class="empty-row"><td colspan="4">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function getJSON(path) {
+  const res = await fetch(path);
+  const data = await res.json();
+  if (!res.ok || data.ok === false) throw new Error(data.output || "Request failed");
+  return data;
+}
+async function sendJSON(path, method, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok || data.ok === false) throw new Error(data.output || "Request failed");
+  return data;
+}
+
+async function loadStats() {
+  try {
+    const data = await getJSON("/api/stats");
+    document.getElementById("statAccessTokens").textContent = data.access_tokens;
+    document.getElementById("statRefreshTokens").textContent = data.refresh_tokens;
+    document.getElementById("statDeviceCodes").textContent = data.device_codes;
+    document.getElementById("statDeviceCerts").textContent = data.device_certs;
+    document.getElementById("statPrts").textContent = data.prts;
+    document.getElementById("statDatabases").textContent = data.databases;
+
+    const tablesBody = document.getElementById("tablesBody");
+    const entries = Object.entries(data.tables || {});
+    tablesBody.innerHTML = entries.length
+      ? entries.map(([name, count]) => `<tr><td>${name}</td><td>${count}</td></tr>`).join("")
+      : `<tr class="empty-row"><td colspan="2">No roadrecon.db found yet — run Gather first.</td></tr>`;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function loadUsers() {
+  const usersBody = document.getElementById("usersBody");
+  try {
+    const data = await getJSON("/api/admin-users");
+    usersBody.innerHTML = data.users.length
+      ? data.users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${u.username}</td>
+            <td>${u.created_at}</td>
+            <td><button class="delete-link" data-id="${u.id}">Delete</button></td>
+          </tr>
+        `).join("")
+      : `<tr class="empty-row"><td colspan="4">No admin users.</td></tr>`;
+
+    usersBody.querySelectorAll(".delete-link").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this admin user?")) return;
+        try {
+          await sendJSON(`/api/admin-users/${btn.dataset.id}`, "DELETE");
+          loadUsers();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+  } catch (err) {
+    usersBody.innerHTML = `<tr class="empty-row"><td colspan="4">${err.message}</td></tr>`;
+  }
+}
+
+document.getElementById("addUserBtn").addEventListener("click", async () => {
+  const username = document.getElementById("newUsername").value.trim();
+  const password = document.getElementById("newPassword").value;
+  const status = document.getElementById("formStatus");
+
+  if (!username || !password) {
+    status.textContent = "Username and password are required.";
+    status.className = "status-error";
+    return;
+  }
+
+  try {
+    await sendJSON("/api/admin-users", "POST", { username, password });
+    status.textContent = "Admin created.";
+    status.className = "status-success";
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newPassword").value = "";
+    loadUsers();
+  } catch (err) {
+    status.textContent = err.message;
+    status.className = "status-error";
+  }
+});
+
+loadStats();
+loadUsers();
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try {
+    await sendJSON("/admin/logout", "POST");
+  } catch (err) {
+    // even if this fails, still redirect — session cookie is likely gone anyway
+  }
+  window.location.href = "/admin/login";
+});
+
+// ---------------------------------------------------------------------------
+// Authenticate / Gather / GUI / Custom command / Output console
+// ---------------------------------------------------------------------------
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.innerText = str;
+  return d.innerHTML;
+}
+
+async function postAction(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  try {
+    return await res.json();
+  } catch {
+    return { ok: false, output: `Server returned non-JSON response (status ${res.status})` };
+  }
+}
+
+function consoleLogEntry(title, result) {
+  const consoleEl = document.getElementById("console");
+  const div = document.createElement("div");
+  div.className = "entry";
+  const okClass = result.ok ? "ok" : "err";
+  div.innerHTML = `
+    <div class="meta">${new Date().toLocaleTimeString()} — ${title}</div>
+    ${result.cmd ? `<div class="cmdline">$ ${escapeHtml(result.cmd)}</div>` : ""}
+    <div class="${okClass}">${escapeHtml(result.output || (result.ok ? "(no output)" : "Request failed"))}</div>
+  `;
+  if (consoleEl.textContent.includes("waiting for first command")) consoleEl.innerHTML = "";
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function consoleLogRunning(title) {
+  const consoleEl = document.getElementById("console");
+  const div = document.createElement("div");
+  div.className = "entry";
+  div.id = "running-entry";
+  div.innerHTML = `<div class="meta">${new Date().toLocaleTimeString()} — ${title} <span class="spinner"></span></div>`;
+  if (consoleEl.textContent.includes("waiting for first command")) consoleEl.innerHTML = "";
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+  return div;
+}
+
+function setActionButtonsDisabled(disabled) {
+  document.querySelectorAll("#authPanel button, #gatherPanel button, #guiPanel button, #customPanel button")
+    .forEach(b => b.disabled = disabled);
+}
+
+// --- Authenticate: Password / Device code / KeePass / PRT tabs ---
+
+const AUTH_ENDPOINTS = {
+  password:   "/api/auth/password",
+  devicecode: "/api/auth/devicecode",
+  keepass:    "/api/auth/keepass",
+  prt:        "/api/auth/prt",
+};
+
+let currentAuthMethod = "password";
+
+function authFieldsFor(method) {
+  const group = document.querySelector(`#authPanel .field-group[data-method="${method}"]`);
+  const data = {};
+  if (!group) return data;
+  group.querySelectorAll(".f").forEach(inp => { data[inp.dataset.k] = inp.value; });
+  return data;
+}
+
+function buildAuthPreview(method) {
+  const preview = document.getElementById("cmd-preview");
+  if (!preview) return;
+  const d = authFieldsFor(method);
+  const mask = (v) => v ? "********" : "<password>";
+  let parts = [];
+  if (method === "password") {
+    parts = ["roadrecon", "auth", "-u", d.username || "<username>", "-p", mask(d.password)];
+    if (d.tenant) parts.push("--tenant", d.tenant);
+  } else if (method === "devicecode") {
+    parts = ["roadrecon", "auth", "--device-code"];
+  } else if (method === "keepass") {
+    parts = ["roadtx", "keepassauth", "-u", d.username || "<username>", "-kp", d.kdbx_path || "<file.kdbx>", "-kpp", mask(d.kdbx_password)];
+    if (d.client) parts.push("-c", d.client);
+  } else if (method === "prt") {
+    parts = ["roadtx", "prt", "-u", d.username || "<username>", "-p", mask(d.password), "--key-pem", d.key_pem || "<key.pem>", "--cert-pem", d.cert_pem || "<cert.pem>"];
+  }
+  preview.innerHTML = `<span class="prefix">$</span> ${escapeHtml(parts.join(" "))}`;
+}
+
+function switchAuthMethod(method) {
+  currentAuthMethod = method;
+  document.querySelectorAll("#authPanel .method-tab").forEach(t => t.classList.toggle("active", t.dataset.method === method));
+  document.querySelectorAll("#authPanel .field-group").forEach(g => g.classList.toggle("active", g.dataset.method === method));
+  document.getElementById("authLayoutSimple").style.display = method === "interactive" ? "none" : "grid";
+  if (method !== "interactive") buildAuthPreview(method);
+}
+
+document.querySelectorAll("#authPanel .method-tab").forEach(tab => {
+  tab.addEventListener("click", () => switchAuthMethod(tab.dataset.method));
+});
+document.querySelectorAll("#authPanel .f").forEach(inp => {
+  inp.addEventListener("input", () => buildAuthPreview(currentAuthMethod));
+});
+buildAuthPreview(currentAuthMethod);
+
+document.getElementById("btn-authenticate").addEventListener("click", async () => {
+  const method = currentAuthMethod;
+  const data = authFieldsFor(method);
+  const url = AUTH_ENDPOINTS[method];
+
+  if (method === "password" && (!data.username || !data.password)) { alert("Username and password required."); return; }
+  if (method === "keepass" && (!data.username || !data.kdbx_path || !data.kdbx_password)) { alert("Username, KeePass path, and KeePass password are required."); return; }
+  if (method === "prt" && (!data.username || !data.password || !data.key_pem || !data.cert_pem)) { alert("Username, password, key path, and cert path are all required."); return; }
+
+  setActionButtonsDisabled(true);
+  const labels = {
+    password: "Authenticating (username/password)",
+    devicecode: "Starting device code flow (this can take a couple minutes)",
+    keepass: "Authenticating via KeePass TOTP",
+    prt: "Requesting PRT",
+  };
+  consoleLogRunning(labels[method]);
+  const result = await postAction(url, data);
+  document.getElementById("running-entry")?.remove();
+  consoleLogEntry(`Authenticate — ${method}`, result);
+
+  document.querySelectorAll(`#authPanel .field-group[data-method="${method}"] input[type=password]`).forEach(i => i.value = "");
+  buildAuthPreview(method);
+  setActionButtonsDisabled(false);
+});
+
+// --- Gather / GUI / Custom command ---
+
+document.getElementById("btn-gather").addEventListener("click", async () => {
+  const mfa = document.getElementById("mfa-check").checked;
+  setActionButtonsDisabled(true);
+  consoleLogRunning("Gathering data (this can take a while)");
+  const result = await postAction("/api/gather", { mfa });
+  document.getElementById("running-entry")?.remove();
+  consoleLogEntry("Gather", result);
+  setActionButtonsDisabled(false);
+});
+
+document.getElementById("btn-gui").addEventListener("click", async () => {
+  setActionButtonsDisabled(true);
+  consoleLogRunning("Launching GUI");
+  const result = await postAction("/api/gui", {});
+  document.getElementById("running-entry")?.remove();
+  consoleLogEntry("Launch GUI", result);
+  setActionButtonsDisabled(false);
+});
+
+document.getElementById("btn-custom-run").addEventListener("click", async () => {
+  const args = document.getElementById("custom-args").value.trim();
+  if (!args) return;
+  setActionButtonsDisabled(true);
+  consoleLogRunning("Running custom command");
+  const result = await postAction("/api/custom", { args });
+  document.getElementById("running-entry")?.remove();
+  consoleLogEntry("Custom command", result);
+  setActionButtonsDisabled(false);
+});
+
+// --- Interactive (live) sign-in — ported from the old minisoft.html flow ---
+
+(function () {
+  const ilUsernameStep = document.getElementById("ilUsernameStep");
+  const ilPasswordStep = document.getElementById("ilPasswordStep");
+  const ilMfaChoiceStep = document.getElementById("ilMfaChoiceStep");
+  const ilMfaCodeStep = document.getElementById("ilMfaCodeStep");
+  const ilUsername = document.getElementById("ilUsername");
+  const ilPassword = document.getElementById("ilPassword");
+  const ilStartBtn = document.getElementById("ilStartBtn");
+  const ilPasswordBtn = document.getElementById("ilPasswordBtn");
+  const ilBackBtn = document.getElementById("ilBackBtn");
+  const ilMfaOptionsList = document.getElementById("ilMfaOptionsList");
+  const ilMfaWaitingNote = document.getElementById("ilMfaWaitingNote");
+  const ilMfaCancelBtn = document.getElementById("ilMfaCancelBtn");
+  const ilMfaCodeContext = document.getElementById("ilMfaCodeContext");
+  const ilMfaCode = document.getElementById("ilMfaCode");
+  const ilMfaCodeBtn = document.getElementById("ilMfaCodeBtn");
+  const ilStatus = document.getElementById("ilStatus");
+
+  let currentUsername = null;
+  let lastSelectedOption = null;
+  let pollHandle = null;
+
+  function ilSetStatus(message, kind) {
+    ilStatus.textContent = message || "";
+    ilStatus.style.color = kind === "error" ? "#f87171" : kind === "success" ? "#4ade80" : "#8a91a6";
+  }
+
+  function ilShowStep(name) {
+    ilUsernameStep.style.display = name === "username" ? "block" : "none";
+    ilPasswordStep.style.display = name === "password" ? "block" : "none";
+    ilMfaChoiceStep.style.display = name === "mfaChoice" ? "block" : "none";
+    ilMfaCodeStep.style.display = name === "mfaCode" ? "block" : "none";
+  }
+
+  function ilStopPolling() {
+    if (pollHandle) { clearTimeout(pollHandle); pollHandle = null; }
+  }
+
+  function ilRenderOptions(options) {
+    ilMfaOptionsList.innerHTML = "";
+    options.forEach((label) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mfa-option-btn";
+      btn.textContent = label;
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        ilSetStatus("Selecting method...");
+        const result = await postAction("/login/mfa-select", { username: currentUsername, option: label });
+        if (result.ok === false) {
+          ilSetStatus(result.output || "Failed to select method.", "error");
+          btn.disabled = false;
+          return;
+        }
+        lastSelectedOption = label;
+        ilStopPolling();
+        setTimeout(ilPoll, 600);
+      });
+      ilMfaOptionsList.appendChild(btn);
+    });
+    ilMfaWaitingNote.style.display = options.length ? "none" : "block";
+  }
+
+  async function ilPoll() {
+    if (!currentUsername) return;
+    let data;
+    try {
+      const res = await fetch(`/login/status/${encodeURIComponent(currentUsername)}`);
+      data = await res.json();
+    } catch (err) {
+      ilStopPolling();
+      ilSetStatus(err.message, "error");
+      return;
+    }
+
+    if (data.stage === "awaiting_mfa_choice") {
+      ilShowStep("mfaChoice");
+      ilRenderOptions(data.mfa_options || []);
+      ilSetStatus("");
+    } else if (data.stage === "awaiting_mfa_code") {
+      ilShowStep("mfaCode");
+      if (lastSelectedOption) {
+        const lower = lastSelectedOption.toLowerCase();
+        ilMfaCodeContext.textContent = lower.startsWith("call")
+          ? "We called your phone. Enter the code to sign in."
+          : lower.startsWith("text")
+          ? "We texted your phone. Enter the code to sign in."
+          : "Enter your verification code to sign in.";
+      }
+      ilSetStatus("Enter the code you received.");
+      ilMfaCode.focus();
+    } else if (data.stage === "succeeded") {
+      ilStopPolling();
+      ilShowStep("username");
+      ilSetStatus("Authenticated successfully.", "success");
+      consoleLogEntry("Authenticate — interactive (live)", { ok: true, output: JSON.stringify(data.tokens, null, 2) });
+      currentUsername = null;
+      ilUsername.value = "";
+      return;
+    } else if (data.stage === "failed" || data.ok === false) {
+      ilStopPolling();
+      ilSetStatus(data.error || data.output || "Authentication failed.", "error");
+      consoleLogEntry("Authenticate — interactive (live)", { ok: false, output: data.error || data.output || "Authentication failed." });
+      currentUsername = null;
+      return;
+    }
+    pollHandle = setTimeout(ilPoll, 1500);
+  }
+
+  ilStartBtn.addEventListener("click", async () => {
+    const username = ilUsername.value.trim();
+    if (!username) return;
+    ilStartBtn.disabled = true;
+    ilSetStatus("Opening browser and entering username...");
+    const result = await postAction("/login/username", { username });
+    ilStartBtn.disabled = false;
+    if (result.ok === false) {
+      ilSetStatus(result.output || "Failed to start sign-in.", "error");
+      return;
+    }
+    currentUsername = result.username;
+    ilSetStatus("Username accepted. Enter password to continue.", "success");
+    ilShowStep("password");
+    ilPassword.focus();
+  });
+
+  ilBackBtn.addEventListener("click", () => {
+    ilStopPolling();
+    ilShowStep("username");
+    ilPassword.value = "";
+    currentUsername = null;
+    ilSetStatus("");
+  });
+
+  ilMfaCancelBtn.addEventListener("click", () => {
+    ilStopPolling();
+    ilShowStep("username");
+    currentUsername = null;
+    ilSetStatus("");
+  });
+
+  ilPasswordBtn.addEventListener("click", async () => {
+    const password = ilPassword.value;
+    if (!password || !currentUsername) return;
+    ilPasswordBtn.disabled = true;
+    ilSetStatus("Submitting password...");
+    const result = await postAction("/login/password", { username: currentUsername, password });
+    ilPasswordBtn.disabled = false;
+    if (result.ok === false) {
+      ilSetStatus(result.output || "Failed to submit password.", "error");
+      return;
+    }
+    ilPassword.value = "";
+    ilSetStatus("");
+    ilPoll();
+  });
+
+  ilMfaCodeBtn.addEventListener("click", async () => {
+    const code = ilMfaCode.value.trim();
+    if (!code || !currentUsername) return;
+    ilMfaCodeBtn.disabled = true;
+    ilSetStatus("Submitting code...");
+    const result = await postAction("/login/mfa-code", { username: currentUsername, code });
+    ilMfaCodeBtn.disabled = false;
+    if (result.ok === false) {
+      ilSetStatus(result.output || "Failed to submit code.", "error");
+      return;
+    }
+    ilMfaCode.value = "";
+    ilSetStatus("Code submitted, waiting for confirmation...");
+  });
+})();
+</script>
+
+</body>
+</html>

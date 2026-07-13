@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>roadrecon console</title>
+<style>
+  :root{
+    --bg: #0d1117;
+    --panel: #11161d;
+    --line: #232b36;
+    --text: #d3dae3;
+    --dim: #6b7686;
+    --accent: #4fd6a8;
+    --warn: #e8b84b;
+    --err: #e05d5d;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:14px;
+    line-height:1.5;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    padding-bottom:16px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header h1{
+    font-size:16px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    margin:0;
+    color:var(--text);
+    font-weight:600;
+  }
+  header h1 span{color:var(--accent);}
+  #status-line{
+    font-size:12px;
+    color:var(--dim);
+  }
+  #status-line .dot{
+    display:inline-block;
+    width:7px;height:7px;
+    border-radius:50%;
+    margin-right:6px;
+    background:var(--dim);
+  }
+  #status-line .dot.ok{background:var(--accent);}
+  #status-line .dot.bad{background:var(--err);}
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  @media (max-width:640px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:16px 18px;
+  }
+  .panel.wide{grid-column:1/-1;}
+  .panel h2{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.09em;
+    color:var(--dim);
+    margin:0 0 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel h2::before{
+    content:"";
+    width:3px; height:12px;
+    background:var(--accent);
+    display:inline-block;
+  }
+  .panel p.hint{
+    color:var(--dim);
+    font-size:12px;
+    margin:0 0 12px;
+  }
+
+  label{
+    display:block;
+    font-size:11px;
+    color:var(--dim);
+    margin-bottom:4px;
+    margin-top:10px;
+  }
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=password], select{
+    width:100%;
+    background:#0a0e13;
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:var(--mono);
+    font-size:13px;
+  }
+  select{ appearance:none; cursor:pointer; }
+  input:focus, select:focus{outline:1px solid var(--accent); border-color:var(--accent);}
+
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-top:10px;
+    font-size:12px;
+    color:var(--dim);
+  }
+
+  button{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:9px 16px;
+    border-radius:3px;
+    border:1px solid var(--accent);
+    background:transparent;
+    color:var(--accent);
+    cursor:pointer;
+    margin-top:14px;
+  }
+  button:hover{background:rgba(79,214,168,0.1);}
+  button:disabled{
+    opacity:0.4;
+    cursor:not-allowed;
+  }
+  button.secondary{
+    border-color:var(--line);
+    color:var(--text);
+  }
+  button.secondary:hover{background:rgba(255,255,255,0.04);}
+
+  .auth-layout{
+    display:grid;
+    grid-template-columns:1.1fr 0.9fr;
+    gap:0;
+  }
+  @media (max-width:760px){ .auth-layout{grid-template-columns:1fr;} }
+  .auth-fields{
+    padding-right:20px;
+  }
+  .auth-preview{
+    border-left:1px solid var(--line);
+    padding-left:20px;
+    display:flex;
+    flex-direction:column;
+  }
+  @media (max-width:760px){
+    .auth-preview{ border-left:none; border-top:1px solid var(--line); padding-left:0; padding-top:16px; margin-top:16px; }
+  }
+  .method-tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:16px;
+  }
+  .method-tab{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    padding:6px 10px;
+    border-radius:3px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--dim);
+    cursor:pointer;
+    margin-top:0;
+  }
+  .method-tab.active{
+    border-color:var(--accent);
+    color:var(--accent);
+    background:rgba(79,214,168,0.08);
+  }
+  .field-group{ display:none; }
+  .field-group.active{ display:block; }
+
+  .cmd-preview{
+    background:#080b0f;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:12px 14px;
+    font-size:12.5px;
+    color:var(--accent);
+    word-break:break-all;
+    white-space:pre-wrap;
+    min-height:64px;
+    flex-shrink:0;
+  }
+  .cmd-preview .prefix{ color:var(--dim); }
+  .preview-note{
+    font-size:11px;
+    color:var(--dim);
+    margin-top:8px;
+  }
+
+  #console{
+    background:#080b0f;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:14px 16px;
+    height:220px;
+    overflow-y:auto;
+    font-size:12px;
+    white-space:pre-wrap;
+    word-break:break-word;
+    color:#9fb3c8;
+  }
+  #console .cmd{color:var(--accent);}
+  #console .err{color:var(--err);}
+  #console .ok{color:var(--accent);}
+  #console .entry{
+    border-bottom:1px dashed var(--line);
+    padding:8px 0;
+  }
+  #console .entry:last-child{border-bottom:none;}
+  #console .meta{color:var(--dim); font-size:11px;}
+
+  .spinner{
+    display:inline-block;
+    width:10px;height:10px;
+    border:2px solid var(--line);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+    vertical-align:middle;
+    margin-left:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  footer{
+    margin-top:24px;
+    color:var(--dim);
+    font-size:11px;
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>road<span>recon</span> · console</h1>
+    <div id="status-line"><span class="dot"></span>checking status…</div>
+  </header>
+
+  <div class="grid">
+
+    <div class="panel wide">
+      <h2>Authenticate</h2>
+      <div class="method-tabs">
+        <button type="button" class="method-tab active" data-method="password">Password</button>
+        <button type="button" class="method-tab" data-method="devicecode">Device code</button>
+        <button type="button" class="method-tab" data-method="interactive">Interactive</button>
+        <button type="button" class="method-tab" data-method="keepass">KeePass</button>
+        <button type="button" class="method-tab" data-method="prt">PRT</button>
+      </div>
+
+      <div class="auth-layout">
+        <div class="auth-fields">
+
+          <div class="field-group active" data-method="password">
+            <p class="hint">ROPC grant. No MFA support.</p>
+            <label>Username</label>
+            <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+            <label>Password</label>
+            <input type="password" class="f" data-k="password" placeholder="••••••••">
+            <label>Tenant ID (optional)</label>
+            <input type="text" class="f" data-k="tenant" placeholder="leave blank for common">
+          </div>
+
+          <div class="field-group" data-method="devicecode">
+            <p class="hint">Supports MFA. No fields needed — a code + URL will appear in Output below; complete sign-in in your browser.</p>
+          </div>
+
+          <div class="field-group" data-method="interactive">
+            <p class="hint">Opens a real browser window (roadtx). Supports MFA — you complete it yourself.</p>
+            <label>Username</label>
+            <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+            <label>Password (optional, pre-fills the form)</label>
+            <input type="password" class="f" data-k="password" placeholder="••••••••">
+            <label>Client alias (optional)</label>
+            <input type="text" class="f" data-k="client" placeholder="e.g. azcli, msteams">
+          </div>
+
+          <div class="field-group" data-method="keepass">
+            <p class="hint">Automates MFA using a TOTP seed already enrolled, stored in a KeePass DB you own (roadtx).</p>
+            <label>Username</label>
+            <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+            <label>KeePass file path (.kdbx)</label>
+            <input type="text" class="f" data-k="kdbx_path" placeholder="/path/to/accounts.kdbx">
+            <label>KeePass DB password</label>
+            <input type="password" class="f" data-k="kdbx_password" placeholder="••••••••">
+            <label>Client alias (optional)</label>
+            <input type="text" class="f" data-k="client" placeholder="e.g. azcli, msteams">
+          </div>
+
+          <div class="field-group" data-method="prt">
+            <p class="hint">Requests a Primary Refresh Token via device key/cert (roadtx). Usually still requires prior MFA enrollment via prtenrich.</p>
+            <label>Username</label>
+            <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+            <label>Password</label>
+            <input type="password" class="f" data-k="password" placeholder="••••••••">
+            <label>Device key .pem path</label>
+            <input type="text" class="f" data-k="key_pem" placeholder="/path/to/device.key">
+            <label>Device cert .pem path</label>
+            <input type="text" class="f" data-k="cert_pem" placeholder="/path/to/device.pem">
+          </div>
+
+          <button id="btn-authenticate">Authenticate</button>
+          <button type="button" class="secondary" id="btn-custom-toggle" style="margin-left:8px;">Custom command…</button>
+        </div>
+
+        <div class="auth-preview">
+          <label style="margin-top:0;">Command that will run</label>
+          <div class="cmd-preview" id="cmd-preview"><span class="prefix">$</span> roadrecon auth -u &lt;username&gt; -p &lt;password&gt;</div>
+          <div class="preview-note">Password fields are masked here as ******** — they're still sent securely, just not echoed on screen.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel wide" id="custom-panel" style="display:none;">
+      <h2>Custom command</h2>
+      <p class="hint">Arguments appended after <code>roadrecon</code>, e.g. <code>plugin -h</code></p>
+      <input type="text" id="custom-args" placeholder="plugin -h">
+      <button id="btn-custom-run">Run</button>
+    </div>
+
+    <div class="panel">
+      <h2>Gather</h2>
+      <p class="hint">Builds <code>roadrecon.db</code> from the tenant. Can take a while on larger tenants.</p>
+      <div class="checkbox-row">
+        <input type="checkbox" id="mfa-check">
+        <label for="mfa-check" style="margin:0;">Include MFA info (requires privileged role)</label>
+      </div>
+      <button id="btn-gather">Run gather</button>
+    </div>
+
+    <div class="panel">
+      <h2>GUI</h2>
+      <p class="hint">Launches the standard ROADrecon Flask GUI on its default port.</p>
+      <button id="btn-gui">Launch GUI</button>
+    </div>
+
+    <div class="panel wide">
+      <h2>Output</h2>
+      <div id="console">waiting for first command…</div>
+    </div>
+
+  </div>
+
+  <footer>
+    Local only · binds to 127.0.0.1:5050 · every action shells out directly to your installed <code>roadrecon</code> / <code>roadtx</code> CLI.
+  </footer>
+
+</div>
+
+<script>
+const consoleEl = document.getElementById('console');
+const statusLine = document.getElementById('status-line');
+const cmdPreview = document.getElementById('cmd-preview');
+
+let currentMethod = 'password';
+
+const ENDPOINTS = {
+  password:    '/api/auth/password',
+  devicecode:  '/api/auth/devicecode',
+  interactive: '/api/auth/interactive',
+  keepass:     '/api/auth/keepass',
+  prt:         '/api/auth/prt',
+};
+
+function fieldsFor(method) {
+  const group = document.querySelector(`.field-group[data-method="${method}"]`);
+  const data = {};
+  if (!group) return data;
+  group.querySelectorAll('.f').forEach(inp => {
+    data[inp.dataset.k] = inp.value;
+  });
+  return data;
+}
+
+function buildPreview(method) {
+  const d = fieldsFor(method);
+  const mask = (v) => v ? '********' : '<password>';
+  let parts = [];
+  if (method === 'password') {
+    parts = ['roadrecon', 'auth', '-u', d.username || '<username>', '-p', mask(d.password)];
+    if (d.tenant) parts.push('--tenant', d.tenant);
+  } else if (method === 'devicecode') {
+    parts = ['roadrecon', 'auth', '--device-code'];
+  } else if (method === 'interactive') {
+    parts = ['roadtx', 'interactiveauth'];
+    if (d.username) parts.push('-u', d.username);
+    if (d.password) parts.push('-p', mask(d.password));
+    if (d.client) parts.push('-c', d.client);
+  } else if (method === 'keepass') {
+    parts = ['roadtx', 'keepassauth', '-u', d.username || '<username>', '-kp', d.kdbx_path || '<file.kdbx>', '-kpp', mask(d.kdbx_password)];
+    if (d.client) parts.push('-c', d.client);
+  } else if (method === 'prt') {
+    parts = ['roadtx', 'prt', '-u', d.username || '<username>', '-p', mask(d.password), '--key-pem', d.key_pem || '<key.pem>', '--cert-pem', d.cert_pem || '<cert.pem>'];
+  }
+  cmdPreview.innerHTML = `<span class="prefix">$</span> ${escapeHtml(parts.join(' '))}`;
+}
+
+function switchMethod(method) {
+  currentMethod = method;
+  document.querySelectorAll('.method-tab').forEach(t => t.classList.toggle('active', t.dataset.method === method));
+  document.querySelectorAll('.field-group').forEach(g => g.classList.toggle('active', g.dataset.method === method));
+  buildPreview(method);
+}
+
+document.querySelectorAll('.method-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchMethod(tab.dataset.method));
+});
+
+document.querySelectorAll('.f').forEach(inp => {
+  inp.addEventListener('input', () => buildPreview(currentMethod));
+});
+
+function logEntry(title, result) {
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const okClass = result.ok ? 'ok' : 'err';
+  div.innerHTML = `
+    <div class="meta">${new Date().toLocaleTimeString()} — ${title}</div>
+    <div class="cmd">$ ${result.cmd || ''}</div>
+    <div class="${okClass}">${escapeHtml(result.output || '(no output)')}</div>
+  `;
+  if (consoleEl.textContent.includes('waiting for first command')) {
+    consoleEl.innerHTML = '';
+  }
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function logRunning(title) {
+  const div = document.createElement('div');
+  div.className = 'entry';
+  div.id = 'running-entry';
+  div.innerHTML = `<div class="meta">${new Date().toLocaleTimeString()} — ${title} <span class="spinner"></span></div>`;
+  if (consoleEl.textContent.includes('waiting for first command')) {
+    consoleEl.innerHTML = '';
+  }
+  consoleEl.appendChild(div);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+  return div;
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.innerText = str;
+  return d.innerHTML;
+}
+
+function setButtonsDisabled(disabled) {
+  document.querySelectorAll('button').forEach(b => b.disabled = disabled);
+}
+
+async function post(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {})
+  });
+  return res.json();
+}
+
+async function refreshStatus() {
+  try {
+    const s = await (await fetch('/api/status')).json();
+    const dotClass = s.roadrecon_installed ? (s.db_exists ? 'ok' : '') : 'bad';
+    statusLine.innerHTML = `<span class="dot ${dotClass}"></span>` +
+      `cwd: ${s.cwd} &nbsp;·&nbsp; roadrecon: ${s.roadrecon_installed ? 'found' : 'NOT FOUND'} ` +
+      `&nbsp;·&nbsp; roadtx: ${s.roadtx_installed ? 'found' : 'NOT FOUND'} ` +
+      `&nbsp;·&nbsp; db: ${s.db_exists ? 'present' : 'missing'} ` +
+      `&nbsp;·&nbsp; auth file: ${s.auth_exists ? 'present' : 'missing'}`;
+  } catch (e) {
+    statusLine.innerHTML = `<span class="dot bad"></span>could not reach backend`;
+  }
+}
+refreshStatus();
+buildPreview(currentMethod);
+
+document.getElementById('btn-authenticate').addEventListener('click', async () => {
+  const method = currentMethod;
+  const data = fieldsFor(method);
+  const url = ENDPOINTS[method];
+
+  if (method === 'password' && (!data.username || !data.password)) { alert('Username and password required.'); return; }
+  if (method === 'keepass' && (!data.username || !data.kdbx_path || !data.kdbx_password)) { alert('Username, KeePass path, and KeePass password are required.'); return; }
+  if (method === 'prt' && (!data.username || !data.password || !data.key_pem || !data.cert_pem)) { alert('Username, password, key path, and cert path are all required.'); return; }
+
+  setButtonsDisabled(true);
+  const labels = {
+    password: 'Authenticating (username/password)',
+    devicecode: 'Starting device code flow (this can take a couple minutes)',
+    interactive: 'Launching interactive browser sign-in (roadtx)',
+    keepass: 'Authenticating via KeePass TOTP (roadtx)',
+    prt: 'Requesting PRT (roadtx)',
+  };
+  logRunning(labels[method]);
+  const result = await post(url, data);
+  document.getElementById('running-entry')?.remove();
+  logEntry(`Authenticate — ${method}`, result);
+
+  document.querySelectorAll(`.field-group[data-method="${method}"] input[type=password]`).forEach(i => i.value = '');
+  buildPreview(method);
+
+  setButtonsDisabled(false);
+  refreshStatus();
+});
+
+document.getElementById('btn-gather').addEventListener('click', async () => {
+  const mfa = document.getElementById('mfa-check').checked;
+  setButtonsDisabled(true);
+  logRunning('Gathering data (this can take a while)');
+  const result = await post('/api/gather', {mfa});
+  document.getElementById('running-entry')?.remove();
+  logEntry('Gather', result);
+  setButtonsDisabled(false);
+  refreshStatus();
+});
+
+document.getElementById('btn-gui').addEventListener('click', async () => {
+  setButtonsDisabled(true);
+  logRunning('Launching GUI');
+  const result = await post('/api/gui');
+  document.getElementById('running-entry')?.remove();
+  logEntry('Launch GUI', result);
+  setButtonsDisabled(false);
+});
+
+document.getElementById('btn-custom-toggle').addEventListener('click', () => {
+  const panel = document.getElementById('custom-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
+
+document.getElementById('btn-custom-run').addEventListener('click', async () => {
+  const args = document.getElementById('custom-args').value.trim();
+  if (!args) return;
+  setButtonsDisabled(true);
+  logRunning('Running custom command');
+  const result = await post('/api/custom', {args});
+  document.getElementById('running-entry')?.remove();
+  logEntry('Custom command', result);
+  setButtonsDisabled(false);
+  refreshStatus();
+});
+</script>
+</body>
+</html>
