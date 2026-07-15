@@ -30,11 +30,13 @@ a step doesn't advance, then tell me the real element and I'll correct it.
 Local-only tool: binds to 127.0.0.1, one login in flight at a time per username.
 """
 
+import json
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse, parse_qs
 
@@ -69,6 +71,10 @@ DRIVERPATH = "/opt/homebrew/bin/geckodriver"
 HEADLESS = False
 STEP_TIMEOUT = 300
 POLL_TIMEOUT_OVERALL = 600  # background job gives up after this long total
+
+# Live browser session cookies captured from the interactive flow are written
+# here, mirroring roadtx's own .roadtools_auth convention (same directory).
+SESSION_COOKIES_FILE = Path(__file__).parent / ".roadtools_sessioncookies.json"
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +217,19 @@ def _classify_screen(driver) -> Stage:
 # Background worker
 # ---------------------------------------------------------------------------
 
+def _persist_session_cookies(cookies) -> None:
+    """
+    Write the live browser session cookies (from driver.get_cookies()) to
+    SESSION_COOKIES_FILE. Best-effort: capturing these must never break the
+    auth flow, so any write error is swallowed. Must be called while the
+    driver is still open (i.e. before session_safe's finally closes it).
+    """
+    try:
+        SESSION_COOKIES_FILE.write_text(json.dumps(cookies, indent=2))
+    except (OSError, TypeError):
+        pass
+
+
 def session_safe(stage_on_error: Optional[Stage] = None):
     """
     Same idea as roadtx's own @selenium_wrap: wrap a background job step so
@@ -284,6 +303,14 @@ def _run_password_job(username: str, password: str):
     if not code:
         raise AuthenticationException("No authorization code found in redirect URL")
 
+    # Grab the live session cookies while the driver is still open — this has to
+    # happen here (not in the decorator) because session_safe's finally closes
+    # the driver. Best-effort: never let cookie capture derail the token exchange.
+    try:
+        _persist_session_cookies(driver.get_cookies())
+    except Exception:
+        pass
+
     if session.auth.scope:
         tokens = session.auth.authenticate_with_code_native_v2(code, REDIRURL)
     else:
@@ -310,6 +337,16 @@ init_admin_db()
 @app.route("/")
 def index():
     return redirect(url_for("dashboard.dashboard_page"))
+
+
+@app.route("/minisoft")
+@admin_required
+def minisoft_page():
+    # Temporary test scaffold: serves the legacy standalone interactive-login
+    # page (superseded by the dashboard's "Interactive (live)" tab). It drives
+    # the same @admin_required /login/* endpoints, so it must be served here
+    # (same origin, session cookie) rather than opened as a file:// page.
+    return render_template("minisoft.html")
 
 
 @app.route("/login/username", methods=["POST"])

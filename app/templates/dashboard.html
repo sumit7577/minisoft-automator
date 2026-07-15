@@ -180,7 +180,7 @@
   @media (max-width: 900px) { .auth-layout { grid-template-columns: 1fr; } }
   .auth-fields label { display: block; font-size: 12px; color: #8a91a6; margin: 12px 0 5px; }
   .auth-fields label:first-child { margin-top: 0; }
-  .auth-fields input[type=text], .auth-fields input[type=password] {
+  .auth-fields input[type=text], .auth-fields input[type=password], .auth-fields select {
     width: 100%;
     background: #0b0d12;
     border: 1px solid #262b3a;
@@ -189,6 +189,7 @@
     padding: 8px 10px;
     font-size: 13px;
   }
+  .auth-fields select { appearance: none; -webkit-appearance: none; cursor: pointer; }
   .auth-preview { border-left: 1px solid #1e2230; padding-left: 20px; }
   @media (max-width: 900px) {
     .auth-preview { border-left: none; border-top: 1px solid #1e2230; padding-left: 0; padding-top: 16px; margin-top: 16px; }
@@ -207,6 +208,14 @@
   }
   .cmd-preview .prefix { color: #8a91a6; }
   .preview-note { font-size: 11px; color: #8a91a6; margin-top: 8px; }
+  .auth-warning {
+    display: flex; gap: 8px; align-items: flex-start;
+    background: #2a1d10; border: 1px solid #6b4a1f; border-radius: 8px;
+    color: #f0b45a; font-size: 13px; line-height: 1.45;
+    padding: 10px 12px; margin: 0 0 12px;
+  }
+  .auth-warning .warn-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.35; }
+  .auth-warning code { background: rgba(0,0,0,.25); padding: 1px 4px; border-radius: 4px; }
 
   .btn-primary {
     background: #2b5fd9; color: #fff; border: none; border-radius: 6px;
@@ -266,20 +275,23 @@
 
 <div class="sidebar">
   <div class="brand">R</div>
-  <a class="icon-btn active" href="#dashboardTop" title="Dashboard">
+  <a class="icon-btn active" href="#dashboard" title="Dashboard">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
   </a>
-  <a class="icon-btn" href="#authPanel" title="Authenticate">
+  <a class="icon-btn" href="#auth" title="Authenticate">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3"/><path d="M16 7l3 3"/></svg>
   </a>
-  <a class="icon-btn" href="#gatherPanel" title="Gather">
+  <a class="icon-btn" href="#gather" title="Gather">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/></svg>
   </a>
-  <a class="icon-btn" href="#tablesPanel" title="Database">
+  <a class="icon-btn" href="#database" title="Database">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
   </a>
-  <a class="icon-btn" href="#usersPanel" title="Users">
+  <a class="icon-btn" href="#users" title="Users">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 19c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M16 13.2c2.7 .3 4.5 2 4.5 5.3"/></svg>
+  </a>
+  <a class="icon-btn" href="#cookies" title="Cookies">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3-3 3 3 0 0 1-3-3 3 3 0 0 1-3-3z"/><circle cx="9" cy="10.5" r="1"/><circle cx="14.5" cy="13.5" r="1"/><circle cx="10" cy="15.5" r="1"/></svg>
   </a>
   <div style="flex:1;"></div>
   <button class="icon-btn" id="logoutBtn" title="Logout" style="border:none; background:none; cursor:pointer;">
@@ -288,18 +300,30 @@
 </div>
 
 <div class="main">
-  <h1 id="dashboardTop">Dashboard</h1>
-  <p class="subtitle">Live overview of your ROADtools data</p>
+  <h1 id="pageTitle">Dashboard</h1>
+  <p class="subtitle" id="pageSubtitle">Live overview of your ROADtools data</p>
 
-  <div class="stat-grid" id="statGrid">
-    <div class="stat-card"><div class="stat-label">Access Tokens</div><div class="stat-value blue" id="statAccessTokens">–</div></div>
-    <div class="stat-card"><div class="stat-label">Refresh Tokens</div><div class="stat-value purple" id="statRefreshTokens">–</div></div>
-    <div class="stat-card"><div class="stat-label">Device Codes</div><div class="stat-value yellow" id="statDeviceCodes">–</div></div>
-    <div class="stat-card"><div class="stat-label">Device Certs</div><div class="stat-value green" id="statDeviceCerts">–</div></div>
-    <div class="stat-card"><div class="stat-label">PRTs</div><div class="stat-value blue" id="statPrts">–</div></div>
-    <div class="stat-card"><div class="stat-label">Databases</div><div class="stat-value purple" id="statDatabases">–</div></div>
+  <div class="page" data-page="dashboard">
+    <div class="stat-grid" id="statGrid">
+      <div class="stat-card"><div class="stat-label">Access Tokens</div><div class="stat-value blue" id="statAccessTokens">–</div></div>
+      <div class="stat-card"><div class="stat-label">Refresh Tokens</div><div class="stat-value purple" id="statRefreshTokens">–</div></div>
+      <div class="stat-card"><div class="stat-label">Device Codes</div><div class="stat-value yellow" id="statDeviceCodes">–</div></div>
+      <div class="stat-card"><div class="stat-label">Device Certs</div><div class="stat-value green" id="statDeviceCerts">–</div></div>
+      <div class="stat-card"><div class="stat-label">PRTs</div><div class="stat-value blue" id="statPrts">–</div></div>
+      <div class="stat-card"><div class="stat-label">Databases</div><div class="stat-value purple" id="statDatabases">–</div></div>
+    </div>
+
+    <div class="panel" id="authFilePanel">
+      <div class="panel-header">
+        <h2>Auth file (.roadtools_auth)</h2>
+        <button type="button" id="btn-reveal-tokens">Reveal tokens</button>
+      </div>
+      <div id="authFileDetails" class="subtitle" style="margin:0;">Loading…</div>
+      <pre id="authFileTokens" class="console-log" style="display:none; margin-top:12px; height:auto; max-height:220px;"></pre>
+    </div>
   </div>
 
+  <div class="page" data-page="auth" style="display:none;">
   <div class="panel" id="authPanel">
     <div class="panel-header">
       <h2>Authenticate</h2>
@@ -310,6 +334,10 @@
       <button type="button" class="method-tab" data-method="interactive">Interactive (live)</button>
       <button type="button" class="method-tab" data-method="keepass">KeePass</button>
       <button type="button" class="method-tab" data-method="prt">PRT</button>
+      <button type="button" class="method-tab" data-method="refreshtokento">Refresh → Resource</button>
+      <button type="button" class="method-tab" data-method="winhello">WinHello</button>
+      <button type="button" class="method-tab" data-method="device">Device</button>
+      <button type="button" class="method-tab" data-method="prtauth">PRT auth</button>
     </div>
 
     <div class="auth-layout" id="authLayoutSimple">
@@ -342,15 +370,73 @@
         </div>
 
         <div class="field-group" data-method="prt">
-          <p class="subtitle" style="margin:0 0 8px;">Requests a Primary Refresh Token via device key/cert. Usually still requires prior MFA enrollment via prtenrich.</p>
-          <label>Username</label>
-          <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
-          <label>Password</label>
-          <input type="password" class="f" data-k="password" placeholder="••••••••">
+          <p class="subtitle" style="margin:0 0 8px;">Requests a Primary Refresh Token via device key/cert, using either username+password or a refresh token. Usually still requires prior MFA enrollment via prtenrich.</p>
           <label>Device key .pem path</label>
           <input type="text" class="f" data-k="key_pem" placeholder="/path/to/device.key">
           <label>Device cert .pem path</label>
           <input type="text" class="f" data-k="cert_pem" placeholder="/path/to/device.pem">
+          <label>Refresh token (optional)</label>
+          <input type="password" class="f" data-k="refresh_token" placeholder="'file' = use cached .roadtools_auth, or paste a token">
+          <label>Username (if no refresh token)</label>
+          <input type="text" class="f" data-k="username" placeholder="user@tenant.onmicrosoft.com">
+          <label>Password (if no refresh token)</label>
+          <input type="password" class="f" data-k="password" placeholder="••••••••">
+        </div>
+
+        <div class="field-group" data-method="refreshtokento">
+          <p class="subtitle" style="margin:0 0 8px;">Mints a new access token for a different resource using the refresh token already cached in .roadtools_auth — no fresh sign-in needed. E.g. set resource to <code>urn:ms-drs:enterpriseregistration.windows.net</code> to get a token WinHello can use.</p>
+          <label>Resource</label>
+          <input type="text" class="f" data-k="resource" placeholder="https://graph.windows.net (default)">
+          <label>Client ID / alias (optional)</label>
+          <input type="text" class="f" data-k="client" placeholder="leave blank to use cached client">
+          <label>Custom refresh token (optional)</label>
+          <input type="password" class="f" data-k="refresh_token" placeholder="leave blank to use cached .roadtools_auth token">
+        </div>
+
+        <div class="field-group" data-method="winhello">
+          <p class="subtitle" style="margin:0 0 8px;">Registers a Windows Hello / passkey key against the device registration service. Needs an access token scoped to <code>urn:ms-drs:enterpriseregistration.windows.net</code> — if the token below is left blank, roadtx falls back to whatever's cached in .roadtools_auth, which will fail with a "wrong token audience" error unless that token was requested for this specific resource.</p>
+          <label>Key file path (optional)</label>
+          <input type="text" class="f" data-k="key_pem" placeholder="winhello.key (default)">
+          <label>Access token (optional)</label>
+          <input type="password" class="f" data-k="access_token" placeholder="leave blank to use .roadtools_auth">
+        </div>
+
+        <div class="field-group" data-method="device">
+          <p class="subtitle" style="margin:0 0 8px;">Join, register, or delete a device object using an access token scoped to the device registration service. Needs a token minted via <strong>Refresh → Resource</strong> first (or paste one below), same prerequisite as WinHello. <code>join</code>/<code>register</code> write a device cert + key locally that the PRT / PRT-auth flows then consume.</p>
+          <div class="auth-warning" id="deviceJoinWarning">
+            <span class="warn-icon">⚠️</span>
+            <span><strong>“join” and “register” create a real device object in the target tenant.</strong> This is a live, attributable change to the environment — only run it against a tenant you’re authorized to modify. “delete” removes one using the cert/key below.</span>
+          </div>
+          <label>Action</label>
+          <select class="f" data-k="action">
+            <option value="join">join (Azure AD joined)</option>
+            <option value="register">register (Azure AD registered)</option>
+            <option value="delete">delete</option>
+          </select>
+          <label>Device name (optional)</label>
+          <input type="text" class="f" data-k="name" placeholder="DESKTOP-&lt;RANDOM&gt; (default)">
+          <label>Target domain (optional)</label>
+          <input type="text" class="f" data-k="domain" placeholder="iminyour.cloud (default)">
+          <label>Cert output .pem path (optional)</label>
+          <input type="text" class="f" data-k="cert_pem" placeholder="&lt;devicename&gt;.pem (default)">
+          <label>Key output .pem path (optional)</label>
+          <input type="text" class="f" data-k="key_pem" placeholder="&lt;devicename&gt;.key (default)">
+          <label>Access token (optional)</label>
+          <input type="password" class="f" data-k="access_token" placeholder="leave blank to use .roadtools_auth">
+        </div>
+
+        <div class="field-group" data-method="prtauth">
+          <p class="subtitle" style="margin:0 0 8px;">Authenticate to a resource using a Primary Refresh Token (from the PRT tab, stored in <code>roadtx.prt</code> by default) and cache the resulting tokens in .roadtools_auth. Override the resource to <code>urn:ms-drs:enterpriseregistration.windows.net</code> to mint a token WinHello can use.</p>
+          <label>Client ID / alias</label>
+          <input type="text" class="f" data-k="client" placeholder="04b07795-8ddb-461a-bbee-02f9e1bf7b46 (Azure CLI, default)">
+          <label>Resource</label>
+          <input type="text" class="f" data-k="resource" placeholder="https://graph.windows.net (default)">
+          <label>PRT file (optional)</label>
+          <input type="text" class="f" data-k="prt_file" placeholder="roadtx.prt (default)">
+          <label>Explicit PRT (optional — overrides file)</label>
+          <input type="password" class="f" data-k="prt" placeholder="leave blank to use the PRT file above">
+          <label>PRT session key (required if PRT above is set)</label>
+          <input type="password" class="f" data-k="prt_sessionkey" placeholder="hex session key that pairs with the PRT">
         </div>
 
         <button class="btn-primary" id="btn-authenticate">Authenticate</button>
@@ -395,7 +481,9 @@
       <div class="il-step subtitle" id="ilStatus" style="margin-top:10px;"></div>
     </div>
   </div>
+  </div>
 
+  <div class="page" data-page="gather" style="display:none;">
   <div class="two-col">
     <div class="panel" id="gatherPanel">
       <div class="panel-header"><h2>Gather</h2></div>
@@ -422,12 +510,14 @@
       <button class="btn-primary" id="btn-custom-run" style="margin-top:0;">Run</button>
     </div>
   </div>
+  </div>
 
   <div class="panel" id="outputPanel">
     <div class="panel-header"><h2>Output</h2></div>
     <div class="console-log" id="console">waiting for first command…</div>
   </div>
 
+  <div class="page" data-page="database" style="display:none;">
   <div class="panel" id="tablesPanel">
     <div class="panel-header">
       <h2>roadrecon.db Tables</h2>
@@ -439,7 +529,9 @@
       </tbody>
     </table>
   </div>
+  </div>
 
+  <div class="page" data-page="users" style="display:none;">
   <div class="panel" id="usersPanel">
     <div class="panel-header">
       <h2>Admin Users</h2>
@@ -458,6 +550,30 @@
         <tr class="empty-row"><td colspan="4">Loading...</td></tr>
       </tbody>
     </table>
+  </div>
+  </div>
+
+  <div class="page" data-page="cookies" style="display:none;">
+    <div class="panel" id="sessionCookiesPanel">
+      <div class="panel-header">
+        <h2>Session cookies</h2>
+        <span class="subtitle" id="sessionCookiesCaptured" style="margin:0; font-size:12px;"></span>
+      </div>
+      <p class="subtitle" style="margin:0 0 12px;">Browser cookies captured during the last successful Interactive (live) sign-in.</p>
+      <table>
+        <thead><tr><th>Name</th><th>Domain</th><th>Expiry</th></tr></thead>
+        <tbody id="sessionCookiesBody">
+          <tr class="empty-row"><td colspan="3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="prtCookiePanel">
+      <div class="panel-header"><h2>PRT cookie</h2></div>
+      <p class="subtitle" style="margin:0 0 10px;">Generates a fresh PRT-based auth cookie from <code>roadtx.prt</code> (the file the PRT tab produces). <strong>Valid ~5 minutes</strong> — regenerate right before you use it.</p>
+      <button class="btn-primary" id="btn-prtcookie" style="margin-top:0;">Generate PRT cookie</button>
+      <div class="console-log" id="prtCookieOutput" style="margin-top:14px; height:auto; max-height:280px;">No PRT cookie generated yet.</div>
+    </div>
   </div>
 </div>
 
@@ -530,6 +646,63 @@ async function loadUsers() {
   }
 }
 
+// --- Cookies page: session cookies table + on-demand PRT cookie ---
+
+function fmtCookieExpiry(c) {
+  const raw = c.expiry != null ? c.expiry : c.expires;
+  if (raw == null) return "session";
+  const d = new Date(raw * 1000);
+  return isNaN(d.getTime()) ? String(raw) : d.toLocaleString();
+}
+
+const COOKIES_EMPTY = `<tr class="empty-row"><td colspan="3">No session captured yet — run an Interactive (live) sign-in first.</td></tr>`;
+
+async function loadSessionCookies() {
+  const body = document.getElementById("sessionCookiesBody");
+  const captured = document.getElementById("sessionCookiesCaptured");
+  captured.textContent = "";
+  body.innerHTML = `<tr class="empty-row"><td colspan="3">Loading…</td></tr>`;
+
+  let data;
+  try {
+    const res = await fetch("/api/cookies/session");
+    data = await res.json();
+  } catch (err) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="3">${escapeHtml(err.message)}</td></tr>`;
+    return;
+  }
+
+  if (!data.ok) { body.innerHTML = COOKIES_EMPTY; return; }
+
+  const cookies = Array.isArray(data.cookies) ? data.cookies : [];
+  body.innerHTML = cookies.length
+    ? cookies.map(c => `<tr><td>${escapeHtml(c.name || "")}</td><td>${escapeHtml(c.domain || "")}</td><td>${escapeHtml(fmtCookieExpiry(c))}</td></tr>`).join("")
+    : COOKIES_EMPTY;
+
+  if (data.captured_at) {
+    const t = new Date(data.captured_at);
+    captured.textContent = isNaN(t.getTime()) ? "" : `captured at ${t.toLocaleTimeString()}`;
+  }
+}
+
+document.getElementById("btn-prtcookie").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-prtcookie");
+  const out = document.getElementById("prtCookieOutput");
+  btn.disabled = true;
+  out.innerHTML = `<span class="meta"><span class="spinner"></span>Generating PRT cookie…</span>`;
+
+  const result = await postAction("/api/cookies/prtcookie", {});
+  const okClass = result.ok ? "ok" : "err";
+  const note = result.ok ? "valid ~5 minutes — regenerate when needed" : "failed";
+  out.innerHTML = `
+    <div class="entry">
+      <div class="meta">${new Date().toLocaleTimeString()} — PRT cookie (${note})</div>
+      ${result.cmd ? `<div class="cmdline">$ ${escapeHtml(result.cmd)}</div>` : ""}
+      <div class="${okClass}">${escapeHtml(result.output || (result.ok ? "(no output)" : "Request failed"))}</div>
+    </div>`;
+  btn.disabled = false;
+});
+
 document.getElementById("addUserBtn").addEventListener("click", async () => {
   const username = document.getElementById("newUsername").value.trim();
   const password = document.getElementById("newPassword").value;
@@ -554,8 +727,47 @@ document.getElementById("addUserBtn").addEventListener("click", async () => {
   }
 });
 
+async function loadAuthFileDetails() {
+  const el = document.getElementById("authFileDetails");
+  try {
+    const data = await getJSON("/api/stats");
+    const d = data.auth_details;
+    if (!d) {
+      el.textContent = "No .roadtools_auth file found yet — authenticate first (see Authenticate panel below).";
+      return;
+    }
+    el.innerHTML = `
+      <div>Path: <code>${escapeHtml(d.path)}</code></div>
+      <div style="margin-top:4px;">Tenant: <code>${escapeHtml(d.tenant_id || "-")}</code> &nbsp; Client: <code>${escapeHtml(d.client_id || "-")}</code></div>
+      <div style="margin-top:4px;">Token type: ${escapeHtml(d.token_type || "-")} &nbsp; Expires: ${escapeHtml(d.expires_on || "-")}</div>
+      <div style="margin-top:4px;">Has: access token = ${d.has_access_token ? "yes" : "no"}, refresh token = ${d.has_refresh_token ? "yes" : "no"}, id token = ${d.has_id_token ? "yes" : "no"}</div>
+    `;
+  } catch (err) {
+    el.textContent = err.message;
+  }
+}
+
+document.getElementById("btn-reveal-tokens").addEventListener("click", async () => {
+  const pre = document.getElementById("authFileTokens");
+  if (pre.style.display === "block") {
+    pre.style.display = "none";
+    return;
+  }
+  try {
+    const data = await sendJSON("/api/auth-state/reveal", "POST");
+    pre.textContent =
+      `Access token:\n${data.access_token || "(none)"}\n\n` +
+      `Refresh token:\n${data.refresh_token || "(none)"}\n\n` +
+      `ID token:\n${data.id_token || "(none)"}`;
+    pre.style.display = "block";
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
 loadStats();
 loadUsers();
+loadAuthFileDetails();
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   try {
@@ -624,10 +836,14 @@ function setActionButtonsDisabled(disabled) {
 // --- Authenticate: Password / Device code / KeePass / PRT tabs ---
 
 const AUTH_ENDPOINTS = {
-  password:   "/api/auth/password",
-  devicecode: "/api/auth/devicecode",
-  keepass:    "/api/auth/keepass",
-  prt:        "/api/auth/prt",
+  password:       "/api/auth/password",
+  devicecode:     "/api/auth/devicecode",
+  keepass:        "/api/auth/keepass",
+  prt:            "/api/auth/prt",
+  refreshtokento: "/api/auth/refreshtokento",
+  winhello:       "/api/auth/winhello",
+  device:         "/api/auth/device",
+  prtauth:        "/api/auth/prtauth",
 };
 
 let currentAuthMethod = "password";
@@ -655,7 +871,37 @@ function buildAuthPreview(method) {
     parts = ["roadtx", "keepassauth", "-u", d.username || "<username>", "-kp", d.kdbx_path || "<file.kdbx>", "-kpp", mask(d.kdbx_password)];
     if (d.client) parts.push("-c", d.client);
   } else if (method === "prt") {
-    parts = ["roadtx", "prt", "-u", d.username || "<username>", "-p", mask(d.password), "--key-pem", d.key_pem || "<key.pem>", "--cert-pem", d.cert_pem || "<cert.pem>"];
+    parts = ["roadtx", "prt", "--key-pem", d.key_pem || "<key.pem>", "--cert-pem", d.cert_pem || "<cert.pem>"];
+    if (d.refresh_token) {
+      parts.push("--refresh-token", d.refresh_token.toLowerCase() === "file" ? "file" : mask(d.refresh_token));
+    } else {
+      parts.push("-u", d.username || "<username>", "-p", mask(d.password));
+    }
+  } else if (method === "refreshtokento") {
+    parts = ["roadtx", "refreshtokento"];
+    if (d.resource) parts.push("-r", d.resource);
+    if (d.client) parts.push("-c", d.client);
+    if (d.refresh_token) parts.push("--refresh-token", mask(d.refresh_token));
+  } else if (method === "winhello") {
+    parts = ["roadtx", "winhello"];
+    if (d.key_pem) parts.push("-k", d.key_pem);
+    if (d.access_token) parts.push("--access-token", mask(d.access_token));
+  } else if (method === "device") {
+    parts = ["roadtx", "device", "-a", d.action || "join"];
+    if (d.cert_pem) parts.push("-c", d.cert_pem);
+    if (d.key_pem) parts.push("-k", d.key_pem);
+    if (d.name) parts.push("-n", d.name);
+    if (d.domain) parts.push("-d", d.domain);
+    if (d.access_token) parts.push("--access-token", mask(d.access_token));
+  } else if (method === "prtauth") {
+    parts = ["roadtx", "prtauth"];
+    if (d.client) parts.push("-c", d.client);
+    if (d.resource) parts.push("-r", d.resource);
+    if (d.prt) {
+      parts.push("--prt", mask(d.prt), "--prt-sessionkey", mask(d.prt_sessionkey));
+    } else if (d.prt_file) {
+      parts.push("-f", d.prt_file);
+    }
   }
   preview.innerHTML = `<span class="prefix">$</span> ${escapeHtml(parts.join(" "))}`;
 }
@@ -673,6 +919,7 @@ document.querySelectorAll("#authPanel .method-tab").forEach(tab => {
 });
 document.querySelectorAll("#authPanel .f").forEach(inp => {
   inp.addEventListener("input", () => buildAuthPreview(currentAuthMethod));
+  inp.addEventListener("change", () => buildAuthPreview(currentAuthMethod));
 });
 buildAuthPreview(currentAuthMethod);
 
@@ -683,7 +930,12 @@ document.getElementById("btn-authenticate").addEventListener("click", async () =
 
   if (method === "password" && (!data.username || !data.password)) { alert("Username and password required."); return; }
   if (method === "keepass" && (!data.username || !data.kdbx_path || !data.kdbx_password)) { alert("Username, KeePass path, and KeePass password are required."); return; }
-  if (method === "prt" && (!data.username || !data.password || !data.key_pem || !data.cert_pem)) { alert("Username, password, key path, and cert path are all required."); return; }
+  if (method === "prt") {
+    if (!data.key_pem || !data.cert_pem) { alert("Device key path and cert path are always required."); return; }
+    if (!data.refresh_token && (!data.username || !data.password)) { alert("Provide either a refresh token (or 'file' for the cached one), or a username and password."); return; }
+  }
+  if (method === "refreshtokento" && data.refresh_token && !data.client) { alert("Client ID is required when supplying a custom refresh token."); return; }
+  if (method === "prtauth" && data.prt && !data.prt_sessionkey) { alert("When passing an explicit PRT you must also supply its session key."); return; }
 
   setActionButtonsDisabled(true);
   const labels = {
@@ -691,6 +943,10 @@ document.getElementById("btn-authenticate").addEventListener("click", async () =
     devicecode: "Starting device code flow (this can take a couple minutes)",
     keepass: "Authenticating via KeePass TOTP",
     prt: "Requesting PRT",
+    refreshtokento: "Requesting token for new resource",
+    winhello: "Registering Windows Hello key",
+    device: `Running device ${data.action || "join"}`,
+    prtauth: "Authenticating with PRT",
   };
   consoleLogRunning(labels[method]);
   const result = await postAction(url, data);
@@ -908,6 +1164,38 @@ document.getElementById("btn-custom-run").addEventListener("click", async () => 
     ilSetStatus("Code submitted, waiting for confirmation...");
   });
 })();
+
+// --- Page switcher: each sidebar item shows its own page, SPA-style ---
+
+const PAGES = {
+  dashboard: { title: "Dashboard", subtitle: "Live overview of your ROADtools data" },
+  auth:      { title: "Authenticate", subtitle: "Sign in to the tenant using any supported method" },
+  gather:    { title: "Gather", subtitle: "Build roadrecon.db, launch the GUI, or run a custom command" },
+  database:  { title: "Database", subtitle: "Tables and row counts from roadrecon.db" },
+  users:     { title: "Admin Users", subtitle: "Manage who can sign in to this dashboard" },
+  cookies:   { title: "Cookies", subtitle: "Session cookies from the last Interactive login, plus on-demand PRT cookies" },
+};
+
+function showPage(key) {
+  if (!PAGES[key]) key = "dashboard";
+
+  document.querySelectorAll(".page").forEach(p => {
+    p.style.display = p.dataset.page === key ? "block" : "none";
+  });
+  document.getElementById("pageTitle").textContent = PAGES[key].title;
+  document.getElementById("pageSubtitle").textContent = PAGES[key].subtitle;
+
+  document.querySelectorAll(".sidebar .icon-btn").forEach(a => a.classList.remove("active"));
+  const icon = document.querySelector(`.sidebar a.icon-btn[href="#${key}"]`);
+  if (icon) icon.classList.add("active");
+
+  if (key === "cookies") loadSessionCookies();
+
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
+showPage(location.hash.slice(1));
 </script>
 
 </body>

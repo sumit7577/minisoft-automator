@@ -31,6 +31,7 @@ so nothing there depends on guessed table names.
 import json
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 from flask import Blueprint, jsonify, request, render_template, session
 from werkzeug.security import generate_password_hash
@@ -72,16 +73,24 @@ def _roadrecon_table_counts() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Local roadtx auth-state file — best-effort, defensive parsing
+# Local roadtx auth-state file — verified structure:
+# tokenType, expiresOn, tenantId, _clientId, accessToken, refreshToken,
+# idToken, expiresIn. Device codes / certs / PRTs are not part of this file
+# (roadtx stores those elsewhere per-flow), so those counts stay at 0 until
+# we wire up reading whatever roadtx actually writes for them.
 # ---------------------------------------------------------------------------
 
+def _load_auth_file() -> Optional[dict]:
+    if not ROADTOOLS_AUTH_FILE.exists():
+        return None
+    try:
+        data = json.loads(ROADTOOLS_AUTH_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _read_auth_state() -> dict:
-    """
-    Best-effort. Returns zeroed-out defaults if the file is missing or its
-    structure doesn't match what's expected here. NOT verified against a
-    real roadtx auth file — treat these numbers as provisional until
-    confirmed against your actual file's contents.
-    """
     defaults = {
         "access_tokens": 0,
         "refresh_tokens": 0,
@@ -89,22 +98,31 @@ def _read_auth_state() -> dict:
         "device_certs": 0,
         "prts": 0,
     }
-    if not ROADTOOLS_AUTH_FILE.exists():
-        return defaults
-    try:
-        data = json.loads(ROADTOOLS_AUTH_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        return defaults
-
-    # Defensive guesses at common key shapes — adjust once real structure is known.
-    if isinstance(data, dict):
-        if "accessToken" in data or "access_token" in data:
+    data = _load_auth_file()
+    if data:
+        if data.get("accessToken"):
             defaults["access_tokens"] = 1
-        if "refreshToken" in data or "refresh_token" in data:
+        if data.get("refreshToken"):
             defaults["refresh_tokens"] = 1
-        if "prt" in data or "PRT" in data:
-            defaults["prts"] = 1
     return defaults
+
+
+def _auth_state_details() -> Optional[dict]:
+    """Non-secret metadata from the auth cache file, for display in the UI."""
+    data = _load_auth_file()
+    if not data:
+        return None
+    return {
+        "path": str(ROADTOOLS_AUTH_FILE),
+        "token_type": data.get("tokenType"),
+        "tenant_id": data.get("tenantId"),
+        "client_id": data.get("_clientId"),
+        "expires_on": data.get("expiresOn"),
+        "expires_in": data.get("expiresIn"),
+        "has_access_token": bool(data.get("accessToken")),
+        "has_refresh_token": bool(data.get("refreshToken")),
+        "has_id_token": bool(data.get("idToken")),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +150,21 @@ def api_stats():
         "prts": auth_state["prts"],
         "databases": 1 if ROADRECON_DB_PATH.exists() else 0,
         "tables": table_counts,  # { "Users": 142, "Devices": 30, ... } — real, live counts
+        "auth_details": _auth_state_details(),
+    })
+
+
+@dashboard_bp.route("/api/auth-state/reveal", methods=["POST"])
+@admin_required
+def reveal_auth_state():
+    data = _load_auth_file()
+    if not data:
+        return jsonify({"ok": False, "output": "No .roadtools_auth file found."}), 404
+    return jsonify({
+        "ok": True,
+        "access_token": data.get("accessToken"),
+        "refresh_token": data.get("refreshToken"),
+        "id_token": data.get("idToken"),
     })
 
 
