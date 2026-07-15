@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first so Docker can cache the pip install layer
