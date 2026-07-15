@@ -46,6 +46,7 @@ Local-only tool: binds to 127.0.0.1, one login in flight at a time per username.
 """
 
 import json
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -71,7 +72,7 @@ from selenium.common.exceptions import (
 from roadtools.roadlib.auth import Authentication, AuthenticationException, WELLKNOWN_CLIENTS, WELLKNOWN_RESOURCES
 from roadtools.roadlib.deviceauth import DeviceAuthentication
 
-from admin import admin_bp, admin_required, init_admin_db
+from admin import admin_bp, init_admin_db
 from dashboard import dashboard_bp
 from roadrecon_actions import actions_bp
 
@@ -82,7 +83,7 @@ from roadrecon_actions import actions_bp
 CLIENT_ID = WELLKNOWN_CLIENTS["azcli"]
 RESOURCE = WELLKNOWN_RESOURCES["msgraph"]
 REDIRURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
-DRIVERPATH = "/opt/homebrew/bin/geckodriver"
+DRIVERPATH = os.environ.get("GECKODRIVER_PATH")
 HEADLESS = False
 STEP_TIMEOUT = 300
 POLL_TIMEOUT_OVERALL = 600  # background job gives up after this long total
@@ -391,17 +392,15 @@ def index():
 
 
 @app.route("/minisoft")
-@admin_required
 def minisoft_page():
     # Temporary test scaffold: serves the legacy standalone interactive-login
     # page (superseded by the dashboard's "Interactive (live)" tab). It drives
-    # the same @admin_required /login/* endpoints, so it must be served here
+    # the same /login/* endpoints, so it must be served here
     # (same origin, session cookie) rather than opened as a file:// page.
     return render_template("minisoft.html")
 
 
 @app.route("/login/username", methods=["POST"])
-@admin_required
 def login_username():
     data = request.get_json(force=True) or {}
     username = data.get("username", "").strip()
@@ -473,7 +472,6 @@ def login_username():
 
 
 @app.route("/login/password", methods=["POST"])
-@admin_required
 def login_password():
     data = request.get_json(force=True) or {}
     username = data.get("username", "").strip()
@@ -492,7 +490,6 @@ def login_password():
 
 
 @app.route("/login/org-signin", methods=["POST"])
-@admin_required
 def login_org_signin():
     """
     Best-effort autofill for a federated third-party IdP page. See the
@@ -536,7 +533,6 @@ def login_org_signin():
 
 
 @app.route("/login/status/<username>", methods=["GET"])
-@admin_required
 def login_status(username):
     with _sessions_lock:
         session = _sessions.get(username)
@@ -561,7 +557,6 @@ def login_status(username):
 
 
 @app.route("/login/mfa-select", methods=["POST"])
-@admin_required
 def login_mfa_select():
     data = request.get_json(force=True) or {}
     username = data.get("username", "").strip()
@@ -597,7 +592,6 @@ def login_mfa_select():
 
 
 @app.route("/login/mfa-code", methods=["POST"])
-@admin_required
 def login_mfa_code():
     data = request.get_json(force=True) or {}
     username = data.get("username", "").strip()
