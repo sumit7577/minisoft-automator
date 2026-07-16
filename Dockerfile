@@ -29,10 +29,13 @@ COPY app/ .
 COPY ROADtools/ /ROADtools/
 RUN pip install --no-cache-dir -e /ROADtools/ || true
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 ENV FLASK_APP=main.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
-CMD ["xvfb-run", "-a", "python", "main.py"]
+CMD ["/entrypoint.sh"]
