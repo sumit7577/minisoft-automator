@@ -30,10 +30,37 @@
     letter-spacing: -0.5px;
   }
   .card {
+    position: relative;
     background: #ffffff;
     border-radius: 4px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     padding: 40px 48px;
+  }
+  .top-loader {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  .top-loader.visible { opacity: 1; }
+  .top-loader .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #2b5fd9;
+    animation: top-loader-pulse 1.4s ease-in-out infinite;
+  }
+  .top-loader .dot:nth-child(1) { animation-delay: 0s; }
+  .top-loader .dot:nth-child(2) { animation-delay: 0.2s; }
+  .top-loader .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes top-loader-pulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1); }
   }
   .logo-mark {
     display: flex;
@@ -465,6 +492,9 @@
   <div class="brand">ROADtools</div>
 
   <div class="card">
+    <div class="top-loader" id="topLoader">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
     <div class="logo-mark">
       <div class="dot"></div>
       <span>ROADtools</span>
@@ -662,6 +692,19 @@ const optionsCard = document.getElementById("optionsCard");
 let currentUsername = null;
 let lastSelectedMfaOption = null;
 
+function cancelSession(username) {
+  if (!username) return;
+  const payload = JSON.stringify({ username });
+  const url = `${API_BASE}/login/cancel`;
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+  } else {
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true });
+  }
+}
+
+window.addEventListener("pagehide", () => cancelSession(currentUsername));
+
 const DOTS_LOADER_HTML = '<span class="dots-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
 
 function setStatus(message, kind = "info", loading = false) {
@@ -674,36 +717,59 @@ function setBusy(button, busy, label) {
   button.textContent = busy ? "Working..." : label;
 }
 
+const topLoaderEl = document.getElementById("topLoader");
+let topLoaderCount = 0;
+
+function showTopLoader() {
+  topLoaderCount += 1;
+  topLoaderEl.classList.add("visible");
+}
+
+function hideTopLoader() {
+  topLoaderCount = Math.max(0, topLoaderCount - 1);
+  if (topLoaderCount === 0) topLoaderEl.classList.remove("visible");
+}
+
 async function postJSON(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  let data;
+  showTopLoader();
   try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server returned non-JSON response (status ${res.status})`);
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Server returned non-JSON response (status ${res.status})`);
+    }
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.output || `Request failed (status ${res.status})`);
+    }
+    return data;
+  } finally {
+    hideTopLoader();
   }
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.output || `Request failed (status ${res.status})`);
-  }
-  return data;
 }
 
 async function getJSON(path) {
-  const res = await fetch(`${API_BASE}${path}`);
-  let data;
+  showTopLoader();
   try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server returned non-JSON response (status ${res.status})`);
+    const res = await fetch(`${API_BASE}${path}`);
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Server returned non-JSON response (status ${res.status})`);
+    }
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.output || `Request failed (status ${res.status})`);
+    }
+    return data;
+  } finally {
+    hideTopLoader();
   }
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.output || `Request failed (status ${res.status})`);
-  }
-  return data;
 }
 
 function showScreen(name) {
@@ -932,6 +998,7 @@ backBtn.addEventListener("click", () => {
   stopPolling();
   showScreen("username");
   passwordInput.value = "";
+  cancelSession(currentUsername);
   currentUsername = null;
   setStatus("");
 });
@@ -939,6 +1006,7 @@ backBtn.addEventListener("click", () => {
 mfaCancelBtn.addEventListener("click", () => {
   stopPolling();
   showScreen("username");
+  cancelSession(currentUsername);
   currentUsername = null;
   setStatus("");
 });
@@ -947,6 +1015,7 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-back]")) {
     stopPolling();
     showScreen("username");
+    cancelSession(currentUsername);
     currentUsername = null;
     setStatus("");
   }

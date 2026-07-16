@@ -408,8 +408,18 @@ def login_username():
         return jsonify({"ok": False, "output": "username is required."}), 400
 
     with _sessions_lock:
-        if username in _sessions:
-            return jsonify({"ok": False, "output": "A login is already in progress for this username."}), 409
+        existing = _sessions.get(username)
+        if existing is not None:
+            if time.time() - existing.created_at < POLL_TIMEOUT_OVERALL:
+                return jsonify({"ok": False, "output": "A login is already in progress for this username."}), 409
+            # Stale session past the overall timeout — abandoned by a crashed
+            # job or a frontend that stopped polling. Clean it up and let this
+            # attempt through instead of blocking forever.
+            _sessions.pop(username, None)
+            try:
+                existing.selauth.driver.quit()
+            except Exception:
+                pass
 
     try:
         selauth = _new_selauth()
@@ -556,6 +566,25 @@ def login_status(username):
     return jsonify(payload)
 
 
+@app.route("/login/cancel", methods=["POST"])
+def login_cancel():
+    data = request.get_json(force=True) or {}
+    username = data.get("username", "").strip()
+    if not username:
+        return jsonify({"ok": False, "output": "username is required."}), 400
+
+    with _sessions_lock:
+        session = _sessions.pop(username, None)
+
+    if session is not None:
+        try:
+            session.selauth.driver.quit()
+        except Exception:
+            pass
+
+    return jsonify({"ok": True})
+
+
 @app.route("/login/mfa-select", methods=["POST"])
 def login_mfa_select():
     data = request.get_json(force=True) or {}
@@ -617,4 +646,4 @@ def login_mfa_code():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5050, debug=False)
