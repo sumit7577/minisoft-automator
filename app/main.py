@@ -163,6 +163,28 @@ def _click_robust(driver, element):
         driver.execute_script("arguments[0].click();", element)
 
 
+def _quit_driver_safely(driver) -> None:
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+
+def _username_error_text(driver) -> Optional[str]:
+    """
+    Microsoft shows inline validation errors (e.g. "Enter a valid email
+    address, phone number, or Skype name.") in #usernameError without
+    navigating away or removing #i0118 from the DOM, so callers must check
+    this explicitly rather than assuming #i0118 means the password step.
+    """
+    try:
+        el = driver.find_element(By.ID, "usernameError")
+    except NoSuchElementException:
+        return None
+    text = el.text.strip()
+    return text if text and el.is_displayed() else None
+
+
 def _is_federated_redirect(driver) -> Optional[str]:
     """
     Returns the redirected-to domain if the browser has navigated away from
@@ -416,10 +438,7 @@ def login_username():
             # job or a frontend that stopped polling. Clean it up and let this
             # attempt through instead of blocking forever.
             _sessions.pop(username, None)
-            try:
-                existing.selauth.driver.quit()
-            except Exception:
-                pass
+            threading.Thread(target=_quit_driver_safely, args=(existing.selauth.driver,), daemon=True).start()
 
     try:
         selauth = _new_selauth()
@@ -431,15 +450,26 @@ def login_username():
         el = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "i0116"))
         el.send_keys(username + Keys.ENTER)
 
-        # Wait for EITHER Microsoft's own password field, a completed auth
-        # code, OR a navigation away from login.microsoftonline.com entirely
-        # (federated tenant redirecting to its own IdP — GoDaddy-hosted M365,
-        # ADFS, Okta, etc.).
+        # Wait for EITHER Microsoft's own password field actually becoming
+        # the active step, a completed auth code, a navigation away from
+        # login.microsoftonline.com entirely (federated tenant redirecting
+        # to its own IdP — GoDaddy-hosted M365, ADFS, Okta, etc.), OR an
+        # inline validation error on the username field itself. #i0118 can
+        # be present-but-hidden in the DOM before it's the active step, so
+        # presence alone isn't enough — it must actually be displayed.
         WebDriverWait(driver, STEP_TIMEOUT).until(
-            lambda d: d.find_element(By.ID, "i0118")
+            lambda d: (d.find_element(By.ID, "i0118").is_displayed())
             or "?code=" in d.current_url
             or _is_federated_redirect(d)
+            or _username_error_text(d)
         )
+
+        username_error = _username_error_text(driver)
+        if username_error:
+            # Don't let a slow/hung driver teardown block this response —
+            # quit it in the background and return the error immediately.
+            threading.Thread(target=_quit_driver_safely, args=(driver,), daemon=True).start()
+            return jsonify({"ok": False, "output": username_error}), 400
 
         # The check above can fire on a TRANSIENT state — some tenants show
         # Microsoft's own page (with i0118 briefly present) for an instant
@@ -577,10 +607,7 @@ def login_cancel():
         session = _sessions.pop(username, None)
 
     if session is not None:
-        try:
-            session.selauth.driver.quit()
-        except Exception:
-            pass
+        threading.Thread(target=_quit_driver_safely, args=(session.selauth.driver,), daemon=True).start()
 
     return jsonify({"ok": True})
 

