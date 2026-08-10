@@ -25,9 +25,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the app code (main.py, admin.py, dashboard.py, templates, etc.)
 COPY app/ .
 
-# Copy the ROADtools submodule if it's not installed via pip
-COPY ROADtools/ /ROADtools/
-RUN pip install --no-cache-dir -e /ROADtools/ || true
+# Install roadtx from upstream. Keep this as a RUN layer: installing it by hand in a
+# running container and `docker commit`-ing the result overwrites the image CMD with
+# the pip command, which silently replaces the entrypoint and breaks the container.
+RUN pip install --no-cache-dir git+https://github.com/dirkjanm/ROADtools.git#subdirectory=roadtx
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
