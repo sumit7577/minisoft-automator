@@ -88,7 +88,7 @@ CLIENT_ID = WELLKNOWN_CLIENTS["azcli"]
 RESOURCE = WELLKNOWN_RESOURCES["msgraph"]
 REDIRURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
 DRIVERPATH = os.environ.get("GECKODRIVER_PATH")
-HEADLESS = False
+HEADLESS = True
 STEP_TIMEOUT = 60
 POLL_TIMEOUT_OVERALL = 300  # background job gives up after this long total
 

@@ -133,29 +133,41 @@
     color: #444;
   }
   h1 {
-    font-size: 26px;
-    margin: 0 0 22px;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 20px;
     color: #1b1b1b;
   }
   .password-logo { display: none !important; }
 
-  /* ── Email pill badge (MS-style, centered) ─────────────────── */
+  /* ── Email pill badge (MS-style, left-aligned) ─────────────── */
   .email-badge-row {
-    text-align: center;
-    margin-bottom: 20px;
+    text-align: left;
+    margin-bottom: 16px;
   }
   #passwordEmailDisplay {
-    display: inline-block;
-    padding: 5px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
     border: 1px solid #ccc;
     border-radius: 20px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 400;
     color: #333;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  #passwordEmailDisplay::before {
+    content: "";
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #0078d4;
+    flex-shrink: 0;
   }
 
   /* ── Floating-label bordered input (MS Fluent style) ───────── */
@@ -237,20 +249,20 @@
   .pw-links {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    margin-top: 4px;
+    align-items: flex-start;
+    gap: 0;
+    margin-top: 6px;
   }
   .pw-links a, #passwordCancelBtn {
     color: #0078d4;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13px;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 6px 0;
+    padding: 8px 0;
     min-width: unset;
-    font-weight: normal;
+    font-weight: 400;
     border-radius: 0;
   }
   .pw-links a:hover, #passwordCancelBtn:hover { text-decoration: underline; }
@@ -273,6 +285,12 @@
   body.has-bg-image .pw-eye-btn:hover { color: #fff; }
   body.has-bg-image .pw-links a,
   body.has-bg-image #passwordCancelBtn { color: #4fc3f7; }
+  body.has-bg-image #passwordEmailDisplay {
+    border-color: #444;
+  }
+  body.has-bg-image #passwordEmailDisplay::before {
+    background: #0078d4;
+  }
   body.has-bg-image .password-footer {
     background: #1b1b1b !important;
     border-top-color: #333 !important;
@@ -740,6 +758,7 @@
         <button type="submit" class="primary" id="passwordBtn">Sign in</button>
         <div class="pw-links">
           <a href="#" onclick="return false;">Forgot my password</a>
+          <a href="#" onclick="return false;">Sign-in options</a>
           <button type="button" id="passwordCancelBtn" style="display:none;">← Use a different account</button>
         </div>
       </div>
