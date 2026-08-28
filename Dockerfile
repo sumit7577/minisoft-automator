@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     git \
     firefox-esr \
+    firefox-geckodriver \
     xvfb \
     xauth \
     && rm -rf /var/lib/apt/lists/*

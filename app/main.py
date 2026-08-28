@@ -89,7 +89,7 @@ CLIENT_ID = WELLKNOWN_CLIENTS["azcli"]
 RESOURCE = WELLKNOWN_RESOURCES["msgraph"]
 REDIRURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
 DRIVERPATH = os.environ.get("GECKODRIVER_PATH")
-HEADLESS = False
+HEADLESS = os.environ.get("FLASK_HEADLESS", "true").lower() != "false"
 STEP_TIMEOUT = 60
 POLL_TIMEOUT_OVERALL = 300  # background job gives up after this long total
 
@@ -777,7 +777,7 @@ def _run_org_login_job(username: str):
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 app.secret_key = "paste-your-random-string-here"
 app.register_blueprint(admin_bp)
