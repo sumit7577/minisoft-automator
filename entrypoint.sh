@@ -12,4 +12,4 @@ exec gunicorn \
   --bind 0.0.0.0:5000 \
   --timeout 120 \
   --keep-alive 5 \
-  "main:socketio.wsgi_app"
+  "main:app"
