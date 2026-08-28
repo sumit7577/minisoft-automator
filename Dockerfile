@@ -14,9 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     git \
     firefox-esr \
-    firefox-geckodriver \
     xvfb \
     xauth \
+    wget \
+    && GECKO=$(wget -qO- https://api.github.com/repos/mozilla/geckodriver/releases/latest \
+       | grep '"tag_name"' | cut -d'"' -f4) \
+    && wget -qO /tmp/gecko.tar.gz \
+       "https://github.com/mozilla/geckodriver/releases/download/${GECKO}/geckodriver-${GECKO}-linux64.tar.gz" \
+    && tar -xzf /tmp/gecko.tar.gz -C /usr/local/bin \
+    && rm /tmp/gecko.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first so Docker can cache the pip install layer
