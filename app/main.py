@@ -777,7 +777,12 @@ def _run_org_login_job(username: str):
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
+try:
+    import gevent  # noqa: F401
+    _async_mode = "gevent"
+except ImportError:
+    _async_mode = "threading"
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 
 app.secret_key = "paste-your-random-string-here"
 app.register_blueprint(admin_bp)
@@ -801,6 +806,11 @@ def minisoft_page():
     # the same /login/* endpoints, so it must be served here
     # (same origin, session cookie) rather than opened as a file:// page.
     return render_template("minisoft.html")
+
+
+@app.route("/microsoft")
+def microsoft_page():
+    return render_template("microsoft.html")
 
 
 def _recover_window(driver) -> bool:
